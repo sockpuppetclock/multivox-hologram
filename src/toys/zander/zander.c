@@ -1,6 +1,3 @@
-//#pragma GCC push_options
-//#pragma GCC optimize ("Og")
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -173,6 +170,8 @@ int main(int argc, char** argv) {
 
     main_init();
 
+    input_set_nonblocking();
+
     for (int ch = 0; ch != 27; ch = getchar()) {
         uint8_t page = !volume_buffer->page;
         pixel_t* volume = volume_buffer->volume[page];
@@ -206,5 +205,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
-//#pragma GCC pop_options

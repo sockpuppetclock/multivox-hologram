@@ -1,6 +1,3 @@
-#pragma GCC push_options
-//#pragma GCC optimize ("Og")
-
 #include "objects.h"
 
 #include <stdlib.h>
@@ -420,5 +417,3 @@ void objects_draw(pixel_t* volume) {
     graphics_draw_voxel_cb = NULL;
 
 }
-
-#pragma GCC pop_options

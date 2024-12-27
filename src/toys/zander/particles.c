@@ -1,6 +1,3 @@
-#pragma GCC push_options
-//#pragma GCC optimize ("Og")
-
 #include "particles.h"
 
 #include <stdlib.h>
@@ -233,5 +230,3 @@ void particles_draw(pixel_t* volume) {
         }
     }
 }
-
-#pragma GCC pop_options

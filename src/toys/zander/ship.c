@@ -1,6 +1,3 @@
-#pragma GCC push_options
-//#pragma GCC optimize ("Og")
-
 #include "ship.h"
 
 #include <stdio.h>
@@ -215,5 +212,3 @@ void ship_draw(pixel_t* volume) {
 
     graphics_draw_voxel_cb = NULL;
 }
-
-#pragma GCC pop_options

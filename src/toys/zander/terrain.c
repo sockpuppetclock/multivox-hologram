@@ -1,6 +1,3 @@
-#pragma GCC push_options
-#pragma GCC optimize ("O0")
-
 #include "terrain.h"
 
 #include "mathc.h"
@@ -234,5 +231,3 @@ void terrain_draw(pixel_t* volume) {
         draw_stars(volume);
     }
 }
-
-#pragma GCC pop_options
