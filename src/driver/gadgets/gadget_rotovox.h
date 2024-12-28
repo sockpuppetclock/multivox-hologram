@@ -63,6 +63,6 @@ static const int matrix_init_out[] = {RGB_0_R1, RGB_0_G1, RGB_0_B1, RGB_0_R2, RG
 #define VERTICAL_SCAN
 #define CLOCK_WAITS 4
 
-#include "gadgetcommon.h"
+#include "gadget_common.h"
 
 #endif

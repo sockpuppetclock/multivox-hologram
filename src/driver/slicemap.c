@@ -66,7 +66,7 @@ void slicemap_init(slice_brightness_t brightness) {
 
     const vec2_t vox_centre = {.x=(float)(VOXELS_X-1) * 0.5f, .y=(float)(VOXELS_Y-1) * 0.5f};
 
-    const float tolerancesq[] = {sqrf(0.0625f), sqrf(0.125f), sqrf(0.25f), sqrf(0.5f), sqrf(0.7f)};
+    const float tolerancesq[] = {sqr(0.0625f), sqr(0.125f), sqr(0.25f), sqr(0.5f), sqr(0.7f)};
 
     const int passes = (brightness == SLICE_BRIGHTNESS_BOOSTED ? 2 : 1);
     for (int pass = 0; pass < passes; ++pass) {

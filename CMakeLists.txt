@@ -11,7 +11,7 @@ set(BUILD_DIR ${CMAKE_BINARY_DIR})
 
 
 function(set_gadget GADGET_NAME)
-    set(HEADER_PATH "${SRC_DIR}/gadgets/gadget_${GADGET_NAME}.h")
+    set(HEADER_PATH "${DRIVER_SRC_DIR}/gadgets/gadget_${GADGET_NAME}.h")
     set(OUTPUT_HEADER "${BUILD_DIR}/generated/gadget.h")
     if(EXISTS ${HEADER_PATH})
         message(STATUS "Using gadget header: ${HEADER_PATH}")
@@ -26,9 +26,8 @@ set_gadget(${MULTIVOX_GADGET})
 
 
 include_directories(
-    ${SRC_DIR}/driver
-    ${SRC_DIR}/platform
-    ${SRC_DIR}/gadgets
+    ${DRIVER_SRC_DIR}
+    ${PLATFORM_SRC_DIR}
     ${BUILD_DIR}/generated
 )
 

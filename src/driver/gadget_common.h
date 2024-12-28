@@ -1,5 +1,5 @@
-#ifndef _GADGETCOMMON_H_
-#define _GADGETCOMMON_H_
+#ifndef _GADGET_COMMON_H_
+#define _GADGET_COMMON_H_
 
 // all the gadget-specific stuff goes in gadget_gadgetname.h, and selected via `cmake -DMULTIVOX_GADGET=gadgetname ..`
 

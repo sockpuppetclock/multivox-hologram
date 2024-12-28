@@ -345,7 +345,7 @@ bool objects_hit_and_destroy(float* position) {
 
                 if (!terrain_is_water(objpos.z)) {
                     if (position[2] <= objpos.z + object_models[object].hitbox_height) {
-                        if (vec2_distance_squared(objpos.v, position) <= sqrf(object_models[object].hitbox_radius)) {
+                        if (vec2_distance_squared(objpos.v, position) <= sqr(object_models[object].hitbox_radius)) {
                             object_destroy(x, y, objpos.v);
                             return true;
                         }
