@@ -20,7 +20,6 @@
 #include "mathc.h"
 #include "rammel.h"
 #include "input.h"
-#include "gadget.h"
 #include "graphics.h"
 #include "model.h"
 #include "ship.h"
@@ -28,7 +27,7 @@
 #include "particles.h"
 #include "objects.h"
 
-volume_double_buffer_t* volume_buffer;
+voxel_double_buffer_t* volume_buffer;
 
 int8_t height_map[VOXELS_Y][VOXELS_X][2];
 

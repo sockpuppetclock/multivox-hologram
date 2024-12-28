@@ -12,11 +12,11 @@
 #include <termios.h>
 
 #include "rammel.h"
-#include "gadget.h"
+#include "voxel.h"
 
 
 int content_fd;
-volume_double_buffer_t* volume_buffer;
+voxel_double_buffer_t* volume_buffer;
 
 void vox_blit(const char* filename) {
     FILE* cyc_fd = fopen(filename, "rb");

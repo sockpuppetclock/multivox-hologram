@@ -1,8 +1,8 @@
 #ifndef _PARTICLES_H_
 #define _PARTICLES_H_
 
-#include "gadget.h"
 #include <stdbool.h>
+#include "voxel.h"
 
 typedef enum {
     PARTICLE_COOL_DOWN =  0x01,

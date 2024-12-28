@@ -1,9 +1,8 @@
 #ifndef _MODEL_H_
 #define _MODEL_H_
 
-#include <stddef.h>
 #include "mathc.h"
-#include "gadget.h"
+#include "voxel.h"
 #include "graphics.h"
 
 typedef struct {
@@ -27,7 +26,7 @@ typedef struct {
     uint32_t index_count;
     index_t* indices;
     pixel_t colour;
-    image_t* image;
+    struct image_s* image;
 } surface_t;
 
 typedef struct {

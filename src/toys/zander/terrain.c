@@ -2,7 +2,6 @@
 
 #include "mathc.h"
 #include "rammel.h"
-#include "gadget.h"
 #include "graphics.h"
 #include "model.h"
 #include "zander.h"

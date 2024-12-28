@@ -14,7 +14,6 @@
 #include "graphics.h"
 #include "mathc.h"
 #include "rammel.h"
-#include "gadget.h"
 #include "array.h"
 #include "image.h"
 

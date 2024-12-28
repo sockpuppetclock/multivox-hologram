@@ -1,6 +1,5 @@
 #ifndef _GADGET_H_
 #define _GADGET_H_
-#include <stdint.h>
 
 #define SPIN_SYNC 1
 
@@ -62,7 +61,5 @@ static const int matrix_init_out[] = {RGB_0_R1, RGB_0_G1, RGB_0_B1, RGB_0_R2, RG
 
 #define VERTICAL_SCAN
 #define CLOCK_WAITS 4
-
-#include "gadget_common.h"
 
 #endif

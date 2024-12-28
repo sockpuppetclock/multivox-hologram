@@ -1,6 +1,5 @@
 #ifndef _ROTATION_H_
 #define _ROTATION_H_
-#include "gadget.h"
 
 #define ROTATION_PRECISION 30
 #define ROTATION_FULL (1<<ROTATION_PRECISION)

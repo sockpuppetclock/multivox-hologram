@@ -3,7 +3,7 @@
 
 #include <math.h>
 #include "mathc.h"
-#include "gadget.h"
+#include "voxel.h"
 
 static const float world_gravity = 4.0f;
 

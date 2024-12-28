@@ -1,8 +1,8 @@
 #ifndef _TERRAIN_H_
 #define _TERRAIN_H_
 
-#include "gadget.h"
 #include <stdbool.h>
+#include "voxel.h"
 
 static inline bool terrain_is_water(float altitude) {return altitude <= 1e-2f;}
 

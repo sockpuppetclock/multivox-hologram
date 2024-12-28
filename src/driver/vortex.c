@@ -57,7 +57,6 @@ static void reset_slicemap() {
     memset((void*)slice_buffer, 0, sizeof(slice_buffer));
 }
 
-
 #else
 
 static DEVELOPMENT_ONLY uint non_uniformity = 0;
@@ -65,7 +64,7 @@ static void reset_slicemap() {}
 #endif
 
 static int volume_fd;
-static volume_double_buffer_t* volume_buffer;
+static voxel_double_buffer_t* volume_buffer;
 
 static void* map_volume() {
     mode_t old_umask = umask(0);
@@ -76,12 +75,12 @@ static void* map_volume() {
         return NULL;
     }
 
-    if (ftruncate(volume_fd, sizeof(volume_double_buffer_t)) == -1) {
+    if (ftruncate(volume_fd, sizeof(voxel_double_buffer_t)) == -1) {
         perror("ftruncate");
         return NULL;
     }
 
-    volume_buffer = mmap(NULL, sizeof(volume_double_buffer_t), PROT_READ | PROT_WRITE, MAP_SHARED, volume_fd, 0);
+    volume_buffer = mmap(NULL, sizeof(voxel_double_buffer_t), PROT_READ | PROT_WRITE, MAP_SHARED, volume_fd, 0);
     if (volume_buffer == MAP_FAILED) {
         perror("mmap");
         return NULL;
@@ -91,7 +90,7 @@ static void* map_volume() {
 }
 
 static void unmap_volume() {
-    munmap(volume_buffer, sizeof(volume_double_buffer_t));
+    munmap(volume_buffer, sizeof(voxel_double_buffer_t));
     close(volume_fd);
 }
 
@@ -238,7 +237,7 @@ void* slicer_worker(void *vargp) {
         return NULL;
     }
 
-    volume_double_buffer_t* volume_buffer = mmap(NULL, sizeof(*volume_buffer), PROT_WRITE, MAP_SHARED, fd, 0);
+    voxel_double_buffer_t* volume_buffer = mmap(NULL, sizeof(*volume_buffer), PROT_WRITE, MAP_SHARED, fd, 0);
     if (volume_buffer == MAP_FAILED) {
         perror("mmap");
         slicer_running = false;
@@ -487,7 +486,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    volume_double_buffer_t* buffer = map_volume();
+    voxel_double_buffer_t* buffer = map_volume();
     if (!buffer) {
         fprintf(stderr, "Can't open buffer\n");
         return -1;

@@ -13,7 +13,7 @@ voxels_y = 128
 voxels_z = 64
 voxels_count = voxels_x * voxels_y * voxels_z
 
-class volume_double_buffer_t(ctypes.Structure):
+class voxel_double_buffer_t(ctypes.Structure):
     _fields_ = [("buffers", ctypes.c_uint8 * voxels_z * voxels_x * voxels_y * 2),
                 ("page", ctypes.c_uint8),
                 ("bpc",  ctypes.c_uint8),
@@ -25,8 +25,8 @@ data_queue = queue.Queue(maxsize=2)
 
 def process_data(data_queue):
     shm_fd = os.open("/dev/shm/rotovox_double_buffer", os.O_RDWR)
-    shm_mm = mmap.mmap(shm_fd, ctypes.sizeof(volume_double_buffer_t), mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
-    buffer = volume_double_buffer_t.from_buffer(shm_mm)
+    shm_mm = mmap.mmap(shm_fd, ctypes.sizeof(voxel_double_buffer_t), mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
+    buffer = voxel_double_buffer_t.from_buffer(shm_mm)
 
     while True:
         if not data_queue.empty():

@@ -19,14 +19,11 @@
 #include "mathc.h"
 #include "rammel.h"
 #include "input.h"
-#include "gadget.h"
 #include "graphics.h"
 #include "model.h"
+#include "voxel.h"
 
 #define SHOW_STATS 1
-
- 
-volume_double_buffer_t* volume_buffer;
 
 static float model_rotation[VEC3_SIZE] = {0, 0, 0};
 static float model_position[VEC3_SIZE] = {0, 0, 0};
@@ -47,24 +44,6 @@ static void home_pose() {
     vec3_zero(model_rotation);
     vec3_zero(model_position);
 }
-
-/*static const pixel_t rpds_colour[] = {
-    RGBPIX(  0,  0,  0),
-    RGBPIX(255,  0,  0),
-    RGBPIX(255,255,  0),
-    RGBPIX(  0,255,  0),
-    RGBPIX(  0,255,255),
-    RGBPIX(  0,  0,255),
-    RGBPIX(255,255,255),
-};*/
-static const pixel_t temp_colour[] = {
-    RGBPIX(  0,  0,127),
-    RGBPIX(  0,  0,255),
-    RGBPIX(127,127,  0),
-    RGBPIX(255,127,  0),
-    RGBPIX(255,  0,  0),
-    RGBPIX(255,255,255)
-};
 
 static int scene_count = 0;
 static char** scene_list = NULL;
@@ -129,21 +108,20 @@ model_t* load_scene(char* scene) {
         model = model_load_image(scene);
     } else {
         //assume it's raw voxel data
-        uint8_t page = !volume_buffer->page;
-        pixel_t* content = volume_buffer->volume[page];
+        pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_BACK);
 
         bool read = false;
         FILE* fd = fopen(scene, "rb");
         if (fd) {
-            read = (fread(content, 1, sizeof(volume_buffer->volume[page]), fd) == sizeof(volume_buffer->volume[page]));
+            read = (fread(volume, 1, sizeof(*voxel_buffer->volume), fd) == sizeof(*voxel_buffer->volume));
             fclose(fd);
         }
 
         if (!read) {
-            memset(content, 0, sizeof(volume_buffer->volume[page]));
+            voxel_buffer_clear(volume);
         }
-        volume_buffer->page = page;
-        memcpy(volume_buffer->volume[!page], volume_buffer->volume[page], sizeof(volume_buffer->volume[page]));
+        voxel_buffer_swap();
+        memcpy(voxel_buffer_get(VOXEL_BUFFER_BACK), voxel_buffer_get(VOXEL_BUFFER_FRONT), sizeof(*voxel_buffer->volume));
     }
 
     return model;
@@ -160,8 +138,8 @@ static void cycle_scene(int direction) {
 }
 
 void vox_rotate_z(float angle) {
-    pixel_t* src = volume_buffer->volume[volume_buffer->page == 0];
-    pixel_t* dst = volume_buffer->volume[volume_buffer->page != 0];
+    pixel_t* src = voxel_buffer_get(VOXEL_BUFFER_BACK);
+    pixel_t* dst = voxel_buffer_get(VOXEL_BUFFER_FRONT);
 
     bool flip = false;
     angle = fmodf(fmodf(angle, M_PI*2) + M_PI_2*5, M_PI*2) - M_PI_2;
@@ -313,23 +291,11 @@ int main(int argc, char** argv) {
     scene_count = argc - 1;
     scene_list = &argv[1];
 
-    int fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
-    if (fd == -1) {
-        if (errno != ENOENT) {
-            perror("shm_open");
-            exit(1);
-        }
-        printf("waiting for volume buffer\n");
-    }
-    while (fd == -1) {
-        sleep(1);
-        fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
-    }
-
-    volume_buffer = mmap(NULL, sizeof(*volume_buffer), PROT_WRITE, MAP_SHARED, fd, 0);
-    if (volume_buffer == MAP_FAILED) {
-        perror("mmap");
-        exit(1);
+    if (!voxel_buffer_map()) {
+        printf("waiting for voxel buffer\n");
+        do {
+            sleep(1);
+        } while (!voxel_buffer_map());
     }
 
     cycle_scene(0);
@@ -358,7 +324,7 @@ float matrix[MAT4_SIZE];
 
         switch (ch) {
             case 'b': {
-                volume_buffer->bpc = (volume_buffer->bpc % 3) + 1;
+                voxel_buffer->bpc = (voxel_buffer->bpc % 3) + 1;
             } break;
 
             case '[': {
@@ -443,7 +409,7 @@ float matrix[MAT4_SIZE];
                                 break;
 
                             case BUTTON_VIEW:
-                                volume_buffer->bpc = (volume_buffer->bpc % 3) + 1;
+                                voxel_buffer->bpc = (voxel_buffer->bpc % 3) + 1;
                                 break;
                             
                             default:
@@ -551,16 +517,12 @@ float matrix[MAT4_SIZE];
         }
 
         if (scene_model) {
-            uint8_t page = !volume_buffer->page;
-            pixel_t* content = volume_buffer->volume[page];
+            pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_BACK);
+            voxel_buffer_clear(volume);
 
-            memset(content, 0, sizeof(volume_buffer->volume[page]));
-            //fade_buffer(volume_buffer->volume[page], volume_buffer->volume[!page]);
+            model_draw(volume, scene_model, matrix);
 
-            model_draw(content, scene_model, matrix);
-
-            volume_buffer->page = page;
-
+            voxel_buffer_swap();
         } else {
             if (fabsf(model_rotation[2]) > 0.001f) {
                 vox_rotate_z(model_rotation[2]);
@@ -570,18 +532,9 @@ float matrix[MAT4_SIZE];
 #ifdef SHOW_STATS
         int tbase = temperature_base;
         int tproc = temperature_cpu;
-        if (tbase >= 40000) {
-            int t = min((tbase+500) / 1000, VOXELS_Z);
-            for (int z = 1; z < t; ++z) {
-                for (int i = 0; i < 4; ++i) {
-                    volume_buffer->volume[volume_buffer->page][VOXEL_INDEX(VOXELS_X/2-(i&1), VOXELS_Y/2-((i/2)&1), z)] = (z%10)==0 ? RGBPIX(255,255,255) : temp_colour[z*count_of(temp_colour)/VOXELS_Z];
-                }
-            }
-        }
-
         if (++perf > 60) {
             perf = 0;
-            printf("%u fps   %u rpm    %d.%03d° (%d.%03d°)\n", (uint)volume_buffer->fpcs * 100, (uint)volume_buffer->rpds * 6, tbase / 1000, tbase % 1000, tproc / 1000, tproc % 1000);
+            printf("%u fps   %u rpm    %d.%03d° (%d.%03d°)\n", (uint)voxel_buffer->fpcs * 100, (uint)voxel_buffer->rpds * 6, tbase / 1000, tbase % 1000, tproc / 1000, tproc % 1000);
             //printf("x:%g y:%g z:%g s:%g p:%g r:%g y:%g\n", model_position[0], model_position[1], model_position[2], model_scale, model_rotation[0], model_rotation[1], model_rotation[2]);
         }
 #endif
@@ -601,8 +554,7 @@ float matrix[MAT4_SIZE];
         close(js);
     }
 
-    munmap(volume_buffer, sizeof(*volume_buffer));
-    close(fd);
+    voxel_buffer_unmap();
 
     return 0;
 }

@@ -1,9 +1,11 @@
-#ifndef _GADGET_COMMON_H_
-#define _GADGET_COMMON_H_
+#ifndef _VOXEL_H_
+#define _VOXEL_H_
 
-// all the gadget-specific stuff goes in gadget_gadgetname.h, and selected via `cmake -DMULTIVOX_GADGET=gadgetname ..`
+// all the gadget-specific stuff goes in gadget_gadgetname.h, and is selected via `cmake -DMULTIVOX_GADGET=gadgetname ..`
 
 #include <stdint.h>
+#include <stdbool.h>
+#include "gadget.h"
 
 #define R565(p) (((p)>>8) & 0xf8)
 #define G565(p) (((p)>>3) & 0xfc)
@@ -90,6 +92,20 @@ typedef struct {
     uint8_t bpc;
     uint8_t rpds; //revolutions per decasecond
     uint8_t fpcs; //frames per centisecond
-} volume_double_buffer_t;
+} voxel_double_buffer_t;
+
+typedef enum {
+    VOXEL_BUFFER_FRONT,
+    VOXEL_BUFFER_BACK
+} VOXEL_BUFFER_T;
+
+extern voxel_double_buffer_t* voxel_buffer;
+
+bool voxel_buffer_map(void);
+void voxel_buffer_unmap(void);
+
+pixel_t* voxel_buffer_get(VOXEL_BUFFER_T buffer);
+void voxel_buffer_clear(pixel_t* volume);
+void voxel_buffer_swap(void);
 
 #endif

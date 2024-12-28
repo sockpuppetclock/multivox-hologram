@@ -14,11 +14,9 @@
 #include "mathc.h"
 #include "rammel.h"
 #include "input.h"
-#include "gadget.h"
 #include "graphics.h"
 #include "model.h"
-
-volume_double_buffer_t* volume_buffer;
+#include "voxel.h"
 
 static float tess_vertices[16][VEC4_SIZE] = {
     { 1, 1, 1, 1}, { 1, 1, 1,-1}, { 1, 1,-1, 1}, { 1, 1,-1,-1},
@@ -77,15 +75,7 @@ static float *vec4_transform(float *result, float *v0, float *m0) {
 
 int main(int argc, char** argv) {
 
-    int fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
-    if (fd == -1) {
-        perror("shm_open");
-        exit(1);
-    }
-
-    volume_buffer = mmap(NULL, sizeof(*volume_buffer), PROT_WRITE, MAP_SHARED, fd, 0);
-    if (volume_buffer == MAP_FAILED) {
-        perror("mmap");
+    if (!voxel_buffer_map()) {
         exit(1);
     }
 
@@ -103,14 +93,12 @@ int main(int argc, char** argv) {
     bool show_faces = false;
 
     for (int ch = 0; ch != 27; ch = getchar()) {
-        uint8_t page = !volume_buffer->page;
-        pixel_t* volume = volume_buffer->volume[page];
+        pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_BACK);
+        voxel_buffer_clear(volume);
 
         if (ch == 'f') {
             show_faces = !show_faces;
         }
-
-        memset(volume, 0, sizeof(volume_buffer->volume[page]));
 
         model_rotation[0] = fmodf(model_rotation[0] + 0.013f, 2 * M_PI);
         model_rotation[2] = fmodf(model_rotation[2] + 0.017f, 2 * M_PI);
@@ -141,12 +129,11 @@ int main(int argc, char** argv) {
             graphics_draw_line(volume, transformed[tess_edges[i][0]].v, transformed[tess_edges[i][1]].v, colour);
         }
 
-        volume_buffer->page = page;
+        voxel_buffer_swap();
         usleep(50000);
     }
 
-    munmap(volume_buffer, sizeof(*volume_buffer));
-    close(fd);
+    voxel_buffer_unmap();
 
     return 0;
 }

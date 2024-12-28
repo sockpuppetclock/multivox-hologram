@@ -1,10 +1,9 @@
 #ifndef _IMAGE_H_
 #define _IMAGE_H_
 
-#include <stddef.h>
-#include "gadget.h"
+#include "voxel.h"
 
-typedef struct {
+typedef struct image_s {
     pixel_t* data;
     int width, height;
 } image_t;

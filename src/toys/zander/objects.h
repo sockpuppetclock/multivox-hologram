@@ -1,8 +1,8 @@
 #ifndef _OBJECTS_H_
 #define _OBJECTS_H_
 
-#include "gadget.h"
 #include <stdbool.h>
+#include "voxel.h"
 
 void objects_init(void);
 bool objects_hit_and_destroy(float* position);

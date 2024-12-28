@@ -2,7 +2,7 @@
 #define _SHIP_H_
 
 #include "mathc.h"
-#include "gadget.h"
+#include "voxel.h"
 
 extern struct vec3 ship_position;
 

@@ -1,31 +1,18 @@
-#define _GNU_SOURCE
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
 #include <unistd.h>
-#include <stdint.h>
-#include <sched.h>
-#include <time.h>
-#include <termios.h>
-#include <math.h>
 
 #include "rammel.h"
 #include "input.h"
-#include "gadget.h"
-
-
-size_t buffer_size = VOXELS_X*VOXELS_Y*VOXELS_Z * 2 * sizeof(pixel_t);
-size_t volume_size = VOXELS_X*VOXELS_Y*VOXELS_Z * sizeof(pixel_t);
-
-volume_double_buffer_t* volume_buffer;
+#include "voxel.h"
 
 
 void draw_sphere(int x, int y, int z, int radius, uint8_t colour) {
-    pixel_t* volume = (pixel_t*)volume_buffer->volume[volume_buffer->page];
+    pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_FRONT);
 
     int xi = (x - radius < 0) ? -x : -radius;
     int xs = (x + radius >= VOXELS_X) ? (VOXELS_X-1 - x) : radius;
@@ -49,7 +36,7 @@ void draw_sphere(int x, int y, int z, int radius, uint8_t colour) {
 }
 
 void draw_sphereaa(int x, int y, int z, int radius, uint8_t colour) {
-    pixel_t* volume = (pixel_t*)volume_buffer->volume[volume_buffer->page];
+    pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_FRONT);
 
     int xi = (x - radius < 0) ? -x : -radius;
     int xs = (x + radius >= VOXELS_X) ? (VOXELS_X-1 - x) : radius;
@@ -190,20 +177,9 @@ int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
     
-    int fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
-    if (fd == -1) {
-        perror("shm_open");
+    if (!voxel_buffer_map()) {
         exit(1);
     }
-
-    volume_buffer = mmap(NULL, sizeof(*volume_buffer), PROT_WRITE, MAP_SHARED, fd, 0);
-    if (volume_buffer == MAP_FAILED) {
-        perror("mmap");
-        exit(1);
-    }
-
-    volume_buffer->bpc = 1;
-
 
     for (int i = 0; i < 8; ++i) {
         balls[i].position.x = 0;
@@ -216,8 +192,8 @@ int main(int argc, char** argv) {
         balls[i].radius = SPARK_RADIUS;
     }
 
-    pixel_t* volume = volume_buffer->volume[volume_buffer->page];
-    memset(volume, 0, VOXELS_COUNT * sizeof(pixel_t));
+    pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_FRONT);
+    voxel_buffer_clear(volume);
 
     input_set_nonblocking();
 
@@ -235,8 +211,7 @@ int main(int argc, char** argv) {
         usleep(1000);
     }
 
-    munmap(volume_buffer, sizeof(*volume_buffer));
-    close(fd);
+    voxel_buffer_unmap();
 
     return 0;
 }

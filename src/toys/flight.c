@@ -1,32 +1,19 @@
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <sched.h>
-#include <time.h>
-#include <linux/joystick.h>
-#include <poll.h>
+#include <stdio.h>
 #include <dirent.h>
-#include <termios.h>
+#include <unistd.h>
+#include <time.h>
 
 #include "array.h"
 #include "mathc.h"
 #include "rammel.h"
 #include "input.h"
-#include "gadget.h"
 #include "graphics.h"
 #include "model.h"
+#include "voxel.h"
 
 #include "flight_tiles.h"
-
-volume_double_buffer_t* volume_buffer;
-pixel_t* scratch_volume = NULL;
 
 static array_t tile_set = {sizeof(model_t*)};
 
@@ -180,16 +167,8 @@ static void step_tiles(void) {
 
 
 int main(int argc, char** argv) {
-
-    int fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
-    if (fd == -1) {
-        perror("shm_open");
-        exit(1);
-    }
-
-    volume_buffer = mmap(NULL, sizeof(*volume_buffer), PROT_WRITE, MAP_SHARED, fd, 0);
-    if (volume_buffer == MAP_FAILED) {
-        perror("mmap");
+    
+    if (!voxel_buffer_map()) {
         exit(1);
     }
 
@@ -216,11 +195,8 @@ int main(int argc, char** argv) {
     input_set_nonblocking();
 
     for (int ch = 0; ch != 27; ch = getchar()) {
-        uint8_t page = !volume_buffer->page;
-        pixel_t* content = volume_buffer->volume[page];
-
-        memset(content, 0, sizeof(volume_buffer->volume[page]));
-        //fade_buffer(volume_buffer->volume[page], volume_buffer->volume[!page]);
+        pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_BACK);
+        voxel_buffer_clear(volume);
 
         float zoom = 24.0f;
 
@@ -249,17 +225,16 @@ int main(int argc, char** argv) {
                     mat4_apply_translation(matrix, tile->position);
                     mat4_apply_rotation(matrix, tile->rotation);
                     mat4_apply_scale(matrix, tile->scale);
-                    model_draw(content, tile->model, matrix);
+                    model_draw(volume, tile->model, matrix);
                 }
             }
         }
 
-        volume_buffer->page = page;
+        voxel_buffer_swap();
         usleep(50000);
     }
 
-    munmap(volume_buffer, sizeof(*volume_buffer));
-    close(fd);
+    voxel_buffer_unmap();
 
     return 0;
 }

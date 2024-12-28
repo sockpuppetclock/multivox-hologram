@@ -1,6 +1,7 @@
 #ifndef _SLICEMAP_H_
 #define _SLICEMAP_H_
-#include "gadget.h"
+
+#include "voxel.h"
 
 
 #define SLICE_COUNT 360
