@@ -535,7 +535,7 @@ int main(int argc, char** argv) {
         // we unblank the previous row while we're shifting in the new row. This lookup defines
         // how late that unblank happens to vary the brightness for BCM
         const int bpc = min(max(1, buffer->bpc), BPC_MAX);
-        const int gamma[BPC_MAX] = {PANEL_WIDTH-120, PANEL_WIDTH-30, PANEL_WIDTH-7};
+        const int gamma[BPC_MAX] = {PANEL_WIDTH-120, PANEL_WIDTH-60, PANEL_WIDTH-30};
         int unblank[3] = {};
         for (int b = 0; b < bpc; ++b) {
             unblank[(b+1)%bpc] = gamma[b];
