@@ -236,7 +236,11 @@ static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1
             (uv0[0] + uv1[0] + uv2[0]) * (1.0f/3.0f),
             (uv0[1] + uv1[1] + uv2[1]) * (1.0f/3.0f),
         };
-        colour = image_sample(texture, uv);
+        bool masked;
+        colour = image_sample(texture, uv, &masked);
+        if (masked) {
+            return;
+        }
     }
 
     volume[VOXEL_INDEX(pos[0], pos[1], pos[2])] = colour;
@@ -340,18 +344,21 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
                         voxel[2] &= (VOXELS_Z-1);
                     }
 #endif
+                    bool masked = false;
                     if (texture) {
                         float texcoord[2] = {
                             uv0[0] * w[0] + uv1[0] * w[1] + uv2[0] * w[2],
                             uv0[1] * w[0] + uv1[1] * w[1] + uv2[1] * w[2]
                         };
-                        colour = image_sample(texture, texcoord);
+                        colour = image_sample(texture, texcoord, &masked);
                     }
                     
-                    if (graphics_draw_voxel_cb) {
-                        graphics_draw_voxel_cb(volume, voxel, colour);
-                    } else {
-                        volume[VOXEL_INDEX(voxel[0], voxel[1], voxel[2])] = colour;
+                    if (!masked) {
+                        if (graphics_draw_voxel_cb) {
+                            graphics_draw_voxel_cb(volume, voxel, colour);
+                        } else {
+                            volume[VOXEL_INDEX(voxel[0], voxel[1], voxel[2])] = colour;
+                        }
                     }
                 }
             //} else if (done) {

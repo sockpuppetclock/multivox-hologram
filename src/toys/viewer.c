@@ -454,11 +454,14 @@ float matrix[MAT4_SIZE];
                         default:
                         case NAVIGATION_WALKTHROUGH: {
                             switch (event.number) {
-                                case AXIS_LS_X: deuler[2] = (float)event.value * (0.1f / 32767.0f); break;
+                                case AXIS_RS_X: deuler[2] = (float)event.value * (0.1f / 32767.0f); break;
 
-                                case AXIS_LS_Y: doffset[1] = (float)event.value * (0.2f / 32767.0f); break;
-                                case AXIS_RS_X: doffset[0] = (float)event.value * (-0.2f / 32767.0f); break;
-                                case AXIS_RS_Y: doffset[2] = (float)event.value * (0.2f / 32767.0f); break;
+                                case AXIS_LS_Y: doffset[1] = (float)event.value * (( 5.0f / 32767.0f) / model_scale); break;
+                                case AXIS_LS_X: doffset[0] = (float)event.value * ((-5.0f / 32767.0f) / model_scale); break;
+                                case AXIS_RS_Y: {
+                                    int dead = max(0, abs(event.value) - 8192) * (event.value > 0 ? 1 : -1);
+                                    doffset[2] = (float)dead * (( 4.0f / 32767.0f) / model_scale);
+                                } break;
                                 
                                 case AXIS_LT:
                                 case AXIS_RT: {
@@ -474,7 +477,7 @@ float matrix[MAT4_SIZE];
                         } break;
                     }
                 } else {
-                    printf("event type %d\n", event.type);
+                    //printf("event type %d\n", event.type);
                 }
             }
             if (events < 0 && errno != EAGAIN) {

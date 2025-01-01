@@ -21,12 +21,18 @@ typedef struct {
     float x, y, radius;
 } circle_t;
 
-#define VERTEX_BUCKET_BITS 10
+#define VERTEX_BUCKET_BITS 16
 #define VERTEX_BUCKET_COUNT (1<<VERTEX_BUCKET_BITS)
 
-static array_t scratch_vertices = {sizeof(vec3i_t)};
+#ifdef VERTEX_NORMALS
+typedef struct vec3i vertex_tuple_t;
+static array_t scratch_normals = {sizeof(vertex_tuple_t)};
+#else
+typedef struct vec2i vertex_tuple_t;
+#endif
+
+static array_t scratch_vertices = {sizeof(vertex_tuple_t)};
 static array_t scratch_positions = {sizeof(vec3_t)};
-//static array_t scratch_normals = {sizeof(vec3_t)};
 static array_t scratch_texcoords = {sizeof(vec2_t)};
 static array_t scratch_edges = {sizeof(edge_t)};
 static array_t scratch_edge_exists = {sizeof(uint32_t)};
@@ -49,8 +55,13 @@ static uint get_vertex(uint position, uint texcoord/*, uint normal*/) {
     uint index = position & (VERTEX_BUCKET_COUNT-1);
     uint empty = scratch_vertices.count;
     for (; index < scratch_vertices.count; index += VERTEX_BUCKET_COUNT) {
-        vec3i_t* vert = &((vec3i_t*)scratch_vertices.data)[index];
-        if (vert->v[0] == position && vert->v[1] == texcoord/* && vert->v[2] == normal*/) {
+        vertex_tuple_t* vert = &((vertex_tuple_t*)scratch_vertices.data)[index];
+        if (vert->v[0] == position
+         && vert->v[1] == texcoord
+#ifdef VERTEX_NORMALS
+         && vert->v[2] == normal
+#endif
+        ) {
             return index;
         }
         if (!vert->v[0]) {
@@ -62,13 +73,15 @@ static uint get_vertex(uint position, uint texcoord/*, uint normal*/) {
         index = empty;
     } else {
         array_resize(&scratch_vertices, scratch_vertices.count + VERTEX_BUCKET_COUNT);
-        memset(&((vec3i_t*)scratch_vertices.data)[scratch_vertices.count - VERTEX_BUCKET_COUNT], 0, VERTEX_BUCKET_COUNT * sizeof(vec3i_t));
+        memset(&((vertex_tuple_t*)scratch_vertices.data)[scratch_vertices.count - VERTEX_BUCKET_COUNT], 0, VERTEX_BUCKET_COUNT * sizeof(vertex_tuple_t));
     }
 
-    vec3i_t* vert = &((vec3i_t*)scratch_vertices.data)[index];
+    vertex_tuple_t* vert = &((vertex_tuple_t*)scratch_vertices.data)[index];
     vert->v[0] = position;
     vert->v[1] = texcoord;
-    //vert->v[2] = normal;
+#ifdef VERTEX_NORMALS
+    vert->v[2] = normal;
+#endif
     return index;
 }
 
@@ -282,7 +295,7 @@ static void apply_indices_to_surface(surface_t* surface, array_t* indices) {
 }
 
 model_t* model_load(const char* filename, const model_style_t style) {
-    array_reserve(&scratch_vertices, 1024*64);
+    array_reserve(&scratch_vertices, VERTEX_BUCKET_COUNT * 4);
     array_clear(&scratch_vertices);
 
     array_reserve(&scratch_edges, 1024);
@@ -297,8 +310,10 @@ model_t* model_load(const char* filename, const model_style_t style) {
     array_reserve(&scratch_texcoords, 1024);
     array_clear(&scratch_texcoords);
 
-    //array_reserve(&scratch_normals, 1024);
-    //array_clear(&scratch_normals);
+#ifdef VERTEX_NORMALS
+    array_reserve(&scratch_normals, 1024);
+    array_clear(&scratch_normals);
+#endif
 
     array_reserve(&scratch_indices, 256);
     array_clear(&scratch_indices);
@@ -321,7 +336,9 @@ model_t* model_load(const char* filename, const model_style_t style) {
     //ensure vertex[0] data is 0
     memset(scratch_positions.data, 0, scratch_positions.size);
     memset(scratch_texcoords.data, 0, scratch_texcoords.size);
-    //memset(scratch_normals.data, 0, scratch_normals.size);
+#ifdef VERTEX_NORMALS
+    memset(scratch_normals.data, 0, scratch_normals.size);
+#endif
 
     char line[1024];
     while (fgets(line, sizeof(line), fd)) {
@@ -344,13 +361,15 @@ model_t* model_load(const char* filename, const model_style_t style) {
                         sscanf(line, "vt %f %f", &vert->x, &vert->y);
                     } break;
 
-                    /*case 'n': {
+#ifdef VERTEX_NORMALS
+                    case 'n': {
                         // vertex normal
                         array_resize(&scratch_normals, scratch_normals.count + 1);
                         vec3_t* vert = &((vec3_t*)scratch_normals.data)[scratch_normals.count - 1];
                         sscanf(line, "vn %f %f %f", &vert->x, &vert->z, &vert->y);
                         vert->y = -vert->y;
-                    } break;*/
+                    } break;
+#endif
                 }
 
             } break;
@@ -446,11 +465,13 @@ model_t* model_load(const char* filename, const model_style_t style) {
         model->vertex_count = scratch_vertices.count;
         model->vertices = malloc(model->vertex_count * sizeof(vertex_t));
         for (int i = 0; i < model->vertex_count; ++i) {
-            vec3i_t* ivert = &((vec3i_t*)scratch_vertices.data)[i];
+            vertex_tuple_t* ivert = &((vertex_tuple_t*)scratch_vertices.data)[i];
             vertex_t* mvert = &model->vertices[i];
             vec3_assign(mvert->position.v, ((vec3_t*)scratch_positions.data)[clamp(ivert->v[0]-1, 0, scratch_positions.capacity-1)].v);
             vec2_assign(mvert->texcoord.v, ((vec2_t*)scratch_texcoords.data)[clamp(ivert->v[1]-1, 0, scratch_texcoords.capacity-1)].v);
-            //vec3_assign(mvert->normal.v, ((vec3_t*)scratch_normals.data)[clamp(ivert->v[2]-1, 0, scratch_normals.capacity-1)].v);
+#ifdef VERTEX_NORMALS
+            vec3_assign(mvert->normal.v, ((vec3_t*)scratch_normals.data)[clamp(ivert->v[2]-1, 0, scratch_normals.capacity-1)].v);
+#endif
         }
     }
 
@@ -467,7 +488,7 @@ model_t* model_load(const char* filename, const model_style_t style) {
     }
 
     /*for (int i = 0; i < scratch_vertices.count; ++i) {
-        vec3i_t* ivert = &((vec3i_t*)scratch_vertices.data)[i];
+        vertex_tuple_t* ivert = &((vertex_tuple_t*)scratch_vertices.data)[i];
         printf("%d %d %d\n", ivert->x, ivert->y, ivert->z);
     }*/
     printf("v %ld  e %ld  s %ld\n", scratch_vertices.count, scratch_edges.count, scratch_surfaces.count);
@@ -476,7 +497,9 @@ model_t* model_load(const char* filename, const model_style_t style) {
     array_clear(&scratch_edges);
     array_clear(&scratch_edge_exists);
     array_clear(&scratch_positions);
-    //array_clear(&scratch_normals);
+#ifdef VERTEX_NORMALS
+    array_clear(&scratch_normals);
+#endif
     array_clear(&scratch_texcoords);
     array_clear(&scratch_indices);
     array_clear(&scratch_surfaces);
