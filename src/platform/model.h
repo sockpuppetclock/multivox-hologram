@@ -31,11 +31,12 @@ typedef struct {
 
 typedef struct {
     uint32_t vertex_count;
-    uint32_t edge_count;
-    uint32_t surface_count;
-    
     vertex_t* vertices;
+
+    uint32_t edge_count;
     edge_t* edges;
+    
+    uint32_t surface_count;
     surface_t* surfaces;
 } model_t;
 

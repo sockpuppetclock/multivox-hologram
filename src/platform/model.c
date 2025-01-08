@@ -4,6 +4,7 @@
 #include <string.h>
 #include <linux/limits.h>
 #include <ctype.h>
+#include <time.h>
 
 #include "model.h"
 
@@ -21,16 +22,25 @@ typedef struct {
     float x, y, radius;
 } circle_t;
 
-#define VERTEX_BUCKET_BITS 16
-#define VERTEX_BUCKET_COUNT (1<<VERTEX_BUCKET_BITS)
-
+typedef struct {
+    index_t position;
+    index_t texcoord;
 #ifdef VERTEX_NORMALS
-typedef struct vec3i vertex_tuple_t;
-static array_t scratch_normals = {sizeof(vertex_tuple_t)};
-#else
-typedef struct vec2i vertex_tuple_t;
+    index_t normal;
 #endif
 
+    uint32_t previous;
+} vertex_tuple_t;
+
+#define SCRATCH_VERTEX_BUCKET_BITS 8
+#define SCRATCH_VERTEX_BUCKET_COUNT (1<<SCRATCH_VERTEX_BUCKET_BITS)
+#define SCRATCH_VERTEX_BUCKET_MASK (SCRATCH_VERTEX_BUCKET_COUNT - 1)
+
+static uint32_t scratch_vertex_list[SCRATCH_VERTEX_BUCKET_COUNT];
+
+#ifdef VERTEX_NORMALS
+static array_t scratch_normals = {sizeof(vertex_tuple_t)};
+#endif
 static array_t scratch_vertices = {sizeof(vertex_tuple_t)};
 static array_t scratch_positions = {sizeof(vec3_t)};
 static array_t scratch_texcoords = {sizeof(vec2_t)};
@@ -51,37 +61,63 @@ static void vertex_assign(vertex_t* vertex, float px, float py, float pz, float 
     //vertex->normal.z = nz;
 }
 
-static uint get_vertex(uint position, uint texcoord/*, uint normal*/) {
-    uint index = position & (VERTEX_BUCKET_COUNT-1);
-    uint empty = scratch_vertices.count;
-    for (; index < scratch_vertices.count; index += VERTEX_BUCKET_COUNT) {
-        vertex_tuple_t* vert = &((vertex_tuple_t*)scratch_vertices.data)[index];
-        if (vert->v[0] == position
-         && vert->v[1] == texcoord
+static int vertex_compare(index_t* one, index_t* two) {
 #ifdef VERTEX_NORMALS
-         && vert->v[2] == normal
-#endif
-        ) {
-            return index;
+    for (int i = 0; i < 3; ++i) {
+#else
+    for (int i = 0; i < 2; ++i) {
+#endif    
+        if (one[i] > two[i]) {
+            return 1;
         }
-        if (!vert->v[0]) {
-            empty = index;
+        if (one[i] < two[i]) {
+            return -1;
         }
+    }
+    return 0;
+}
+
+static uint get_vertex(uint position, uint texcoord/*, uint normal*/) {
+    const uint32_t none = ~0u;
+    
+    uint32_t* ihead = &scratch_vertex_list[position & SCRATCH_VERTEX_BUCKET_MASK];
+    uint32_t iprev = none;
+    uint32_t icurr = *ihead;
+
+    while (icurr != none) {
+        vertex_tuple_t* vcurr = &((vertex_tuple_t*)scratch_vertices.data)[icurr];
+        
+        int compare = vertex_compare((index_t*)&vcurr->position, (index_t[]){position, texcoord});
+        if (compare == 0) {
+            return icurr;
+        }
+        if (compare < 0) {
+            break;
+        }
+
+        iprev = icurr;
+        icurr = vcurr->previous;
     }
 
-    if (empty < scratch_vertices.count) {
-        index = empty;
-    } else {
-        array_resize(&scratch_vertices, scratch_vertices.count + VERTEX_BUCKET_COUNT);
-        memset(&((vertex_tuple_t*)scratch_vertices.data)[scratch_vertices.count - VERTEX_BUCKET_COUNT], 0, VERTEX_BUCKET_COUNT * sizeof(vertex_tuple_t));
-    }
+    uint index = scratch_vertices.count;
+    array_resize(&scratch_vertices, index + 1);
 
     vertex_tuple_t* vert = &((vertex_tuple_t*)scratch_vertices.data)[index];
-    vert->v[0] = position;
-    vert->v[1] = texcoord;
+    vert->previous = none;
+    vert->position = position;
+    vert->texcoord = texcoord;
 #ifdef VERTEX_NORMALS
-    vert->v[2] = normal;
+    vert->normal = normal;
 #endif
+
+    if (iprev == none) {
+        *ihead = index;
+    } else {
+        vertex_tuple_t* vprev = &((vertex_tuple_t*)scratch_vertices.data)[iprev];
+        vert->previous = vprev->previous;
+        vprev->previous = index;
+    }
+
     return index;
 }
 
@@ -104,21 +140,6 @@ static bool edge_exists(index_t end0, index_t end1) {
     uint32_t* bucket = &((uint32_t*)scratch_edge_exists.data)[bitbucket];
     bool exists = ((*bucket) & bitmask) != 0;
 
-    /*
-    //printf("%d %d %ld %d %ld 0x%08X\n", end0, end1, bitindex, exists, bitbucket, bitmask);
-    bool check = false;
-    for (int i = scratch_edges.count - 1; i >= 0; --i) {
-        edge_t* edge = &((edge_t*)scratch_edges.data)[i];
-        if (edge->index[0] == end0 && edge->index[1] == end1) {
-            check = true;
-            break;
-        }
-    }
-    if (check != exists) {
-        printf("sad face\n");
-    }
-    */
-
     *bucket |= bitmask;
     
     return exists;
@@ -136,12 +157,16 @@ static uint parse_vertex(char* group, bool position_only) {
     p = strtol(tok, &tok, 10);
     if (!position_only && tok && tok[0] == '/') {
         if (tok[1] == '/') {
-            //n = strtol(tok+2, &tok, 10);
+#ifdef VERTEX_NORMALS
+            n = strtol(tok+2, &tok, 10);
+#endif
         } else {
             t = strtol(tok+1, &tok, 10);
-            /*if (tok && tok[0] == '/') {
+#ifdef VERTEX_NORMALS
+            if (tok && tok[0] == '/') {
                 n = strtol(tok+1, &tok, 10);
-            }*/
+            }
+#endif
         }
     }
     return get_vertex(p, t/*, n*/);
@@ -294,51 +319,45 @@ static void apply_indices_to_surface(surface_t* surface, array_t* indices) {
     array_clear(indices);
 }
 
-model_t* model_load(const char* filename, const model_style_t style) {
-    array_reserve(&scratch_vertices, VERTEX_BUCKET_COUNT * 4);
+static void clear_scratch_arrays() {
+    memset(scratch_vertex_list, 0xff, sizeof(scratch_vertex_list));
+
     array_clear(&scratch_vertices);
-
-    array_reserve(&scratch_edges, 1024);
     array_clear(&scratch_edges);
-
-    array_reserve(&scratch_edge_exists, 1024);
     array_clear(&scratch_edge_exists);
-
-    array_reserve(&scratch_positions, 1024);
     array_clear(&scratch_positions);
-
-    array_reserve(&scratch_texcoords, 1024);
     array_clear(&scratch_texcoords);
-
-#ifdef VERTEX_NORMALS
-    array_reserve(&scratch_normals, 1024);
-    array_clear(&scratch_normals);
-#endif
-
-    array_reserve(&scratch_indices, 256);
     array_clear(&scratch_indices);
-
-    array_reserve(&scratch_surfaces, 64);
     array_clear(&scratch_surfaces);
-
-    add_surface(&scratch_surfaces, NULL);
-    pixel_t colour = 0b01010011;
-
-    array_reserve(&scratch_materials, 64);
     array_clear(&scratch_materials);
+#ifdef VERTEX_NORMALS
+    array_clear(&scratch_normals);
 
+    array_reserve(&scratch_normals, 16384);
+#endif
+    array_reserve(&scratch_vertices, 65536);
+    array_reserve(&scratch_positions, 16384);
+    array_reserve(&scratch_texcoords, 16384);
+    array_reserve(&scratch_edges, 16384);
+    array_reserve(&scratch_edge_exists, 16384);
+    array_reserve(&scratch_indices, 65536);
+    array_reserve(&scratch_surfaces, 256);
+    array_reserve(&scratch_materials, 256);
+
+}
+
+model_t* model_load(const char* filename, const model_style_t style) {
+    clock_t time_start = clock();
 
     FILE* fd = fopen(filename, "r");
     if (!fd) {
         return NULL;
     }
 
-    //ensure vertex[0] data is 0
-    memset(scratch_positions.data, 0, scratch_positions.size);
-    memset(scratch_texcoords.data, 0, scratch_texcoords.size);
-#ifdef VERTEX_NORMALS
-    memset(scratch_normals.data, 0, scratch_normals.size);
-#endif
+    clear_scratch_arrays();
+
+    add_surface(&scratch_surfaces, NULL);
+    pixel_t colour = 0b01010011;
 
     char line[1024];
     while (fgets(line, sizeof(line), fd)) {
@@ -467,8 +486,8 @@ model_t* model_load(const char* filename, const model_style_t style) {
         for (int i = 0; i < model->vertex_count; ++i) {
             vertex_tuple_t* ivert = &((vertex_tuple_t*)scratch_vertices.data)[i];
             vertex_t* mvert = &model->vertices[i];
-            vec3_assign(mvert->position.v, ((vec3_t*)scratch_positions.data)[clamp(ivert->v[0]-1, 0, scratch_positions.capacity-1)].v);
-            vec2_assign(mvert->texcoord.v, ((vec2_t*)scratch_texcoords.data)[clamp(ivert->v[1]-1, 0, scratch_texcoords.capacity-1)].v);
+            vec3_assign(mvert->position.v, ((vec3_t*)scratch_positions.data)[clamp(ivert->position-1, 0, scratch_positions.capacity-1)].v);
+            vec2_assign(mvert->texcoord.v, ((vec2_t*)scratch_texcoords.data)[clamp(ivert->texcoord-1, 0, scratch_texcoords.capacity-1)].v);
 #ifdef VERTEX_NORMALS
             vec3_assign(mvert->normal.v, ((vec3_t*)scratch_normals.data)[clamp(ivert->v[2]-1, 0, scratch_normals.capacity-1)].v);
 #endif
@@ -491,7 +510,7 @@ model_t* model_load(const char* filename, const model_style_t style) {
         vertex_tuple_t* ivert = &((vertex_tuple_t*)scratch_vertices.data)[i];
         printf("%d %d %d\n", ivert->x, ivert->y, ivert->z);
     }*/
-    printf("v %ld  e %ld  s %ld\n", scratch_vertices.count, scratch_edges.count, scratch_surfaces.count);
+    printf("v %ld  e %ld  s %ld   %ld ms\n", scratch_vertices.count, scratch_edges.count, scratch_surfaces.count, (clock() - time_start) / 1000);
 
     array_clear(&scratch_vertices);
     array_clear(&scratch_edges);
