@@ -34,7 +34,7 @@ void array_resize(array_t* array, size_t count) {
             array->capacity = count > 64 ? count : 64;
         }
         array->count = count;
-        array->data = malloc(array->count * array->size);
+        array->data = malloc(array->capacity * array->size);
         assert(array->data);
     } else {
         if (count > array->capacity) {
