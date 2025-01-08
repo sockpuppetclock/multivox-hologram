@@ -46,8 +46,15 @@ static DEVELOPMENT_ONLY int debug_panel = 0;
 static DEVELOPMENT_ONLY uint32_t stop_axis = 1;
 
 #ifdef HORIZONTAL_PRESLICE
+
+#ifdef STINT_ON_BUFFER
 // the 4 way symmetry of the slice map means we can use a 1/4 size slice buffer and still not need to clear unmapped columns
-static pixel_t slice_buffer[SLICE_QUADRANT][PANEL_FIELD_HEIGHT][PANEL_COUNT][PANEL_MULTIPLEX][PANEL_WIDTH] = {};
+#define SLICE_BUFFER_SLICES SLICE_QUADRANT
+#else
+#define SLICE_BUFFER_SLICES SLICE_COUNT
+#endif
+
+static pixel_t slice_buffer[SLICE_BUFFER_SLICES][PANEL_FIELD_HEIGHT][PANEL_COUNT][PANEL_MULTIPLEX][PANEL_WIDTH] = {};
 #define SLICE_BUFFER_WRAP(slice) ((slice) % (count_of(slice_buffer)))
 
 static DEVELOPMENT_ONLY uint non_uniformity = (uint)SLICE_BRIGHTNESS_BOOSTED;

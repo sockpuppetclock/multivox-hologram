@@ -20,6 +20,9 @@
 #define CHECK_BOUNDS
 
 graphics_draw_voxel_cb_t graphics_draw_voxel_cb = NULL;
+#ifdef TRIANGLE_DITHER
+float graphics_triangle_fuzz = 0.25f;
+#endif
 
 static inline bool clip(float* one, float* two, const uint c, const float maxval) {
     if (one[c] > two[c]) {
@@ -334,7 +337,12 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
             if (w[0] >= e && w[1] >= e && w[2] >= e) {
                 //done = true;
                 
-                voxel[zchannel] = (int)floorf(v0[zchannel] * w[0] + v1[zchannel] * w[1] + v2[zchannel] * w[2]);
+#ifdef TRIANGLE_DITHER
+                float dither = ((float)(((x&1)<<1)|(y&1)) - 1.5f) * graphics_triangle_fuzz;
+#else
+                const float dither = 0;
+#endif
+                voxel[zchannel] = (int)floorf(v0[zchannel] * w[0] + v1[zchannel] * w[1] + v2[zchannel] * w[2] + dither);
                 if (voxel[zchannel] >= 0 && voxel[zchannel] < voxels_z) {
 #ifdef CHECK_BOUNDS
                     if (voxel[0] < 0 || voxel[0] >= VOXELS_X || voxel[1] < 0 || voxel[1] >= VOXELS_Y ||voxel[2] < 0 || voxel[2] >= VOXELS_Z) {

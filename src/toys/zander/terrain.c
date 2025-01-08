@@ -119,7 +119,12 @@ float terrain_get_altitude(float x, float y) {
     return bilerp(heights, local);
 }
 
+
 void draw_ground(pixel_t* volume) {
+#ifdef HEIGHT_DITHER
+    const float height_fuzz = 0.25f;
+    uint fuzz_origin = ((((int)world_position.x)&1)<<1) | (((int)world_position.y)&1);
+#endif
 
     for (int y = 0; y < VOXELS_Y; ++y) {
         for (int x = 0; x < VOXELS_X; ++x) {
@@ -127,7 +132,12 @@ void draw_ground(pixel_t* volume) {
 
             float altitude = terrain_get_altitude(pos.x, pos.y);
 
-            int32_t z = (altitude - world_position.z) * world_scale;
+#ifdef HEIGHT_DITHER
+            float dither = ((float)((((x&1)<<1)|(y&1))^fuzz_origin) - 1.5f) * height_fuzz;
+#else
+            const float dither = 0;
+#endif
+            int32_t z = ((altitude - world_position.z) * world_scale) + dither;
             height_map[y][x][0] = height_map[y][x][1] = clamp(z, -127, 127);
 
             if (z < 0 && depth_dither(z, pos.v)) {
@@ -176,7 +186,7 @@ void draw_ground(pixel_t* volume) {
                         }
                         
                         crest = min(crest, depth * -0.25f);
-                        z = (crest - world_position.z) * world_scale;
+                        z = ((crest - world_position.z) * world_scale) + dither;
                     }
                 //}
 #endif
