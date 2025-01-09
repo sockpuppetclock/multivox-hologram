@@ -10,13 +10,6 @@ static const float world_gravity = 4.0f;
 extern float world_scale;
 extern struct vec3 world_position;
 
-extern float control_thrust;
-extern struct vec2 control_stick;
-extern bool control_fire;
-
-extern uint32_t time_framecount;
-extern uint32_t time_now_ms;
-
 extern int8_t height_map[VOXELS_Y][VOXELS_X][2];
 #define HEIGHT_MAP_OBJECT(x, y) (height_map[y][x][1])
 #define HEIGHT_MAP_TERRAIN(x, y) (height_map[y][x][0])

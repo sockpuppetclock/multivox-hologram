@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD 11)
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(DRIVER_SRC_DIR ${SRC_DIR}/driver)
 set(PLATFORM_SRC_DIR ${SRC_DIR}/platform)
+set(MULTIVOX_SRC_DIR ${SRC_DIR}/multivox)
 
 set(BUILD_DIR ${CMAKE_BINARY_DIR})
 
@@ -31,12 +32,12 @@ include_directories(
     ${BUILD_DIR}/generated
 )
 
-file(GLOB DRIVER_SRC ${DRIVER_SRC_DIR}/*.c)
-
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMATHC_USE_UNIONS -O3 -Wall")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DMATHC_USE_UNIONS -Og -Wall")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -DMATHC_USE_UNIONS -O3 -Wall")
 
+
+file(GLOB DRIVER_SRC ${DRIVER_SRC_DIR}/*.c)
 add_executable(vortex
     ${DRIVER_SRC}
     ${PLATFORM_SRC_DIR}/mathc.c
@@ -44,9 +45,14 @@ add_executable(vortex
 )
 target_link_libraries(vortex PRIVATE m rt pthread)
 
-
 file(GLOB PLATFORM_SRC ${PLATFORM_SRC_DIR}/*.c)
 add_library(platform STATIC ${PLATFORM_SRC})
+
+file(GLOB MULTIVOX_SRC ${MULTIVOX_SRC_DIR}/*.c)
+add_executable(multivox
+    ${MULTIVOX_SRC}
+)
+target_link_libraries(multivox PRIVATE platform m)
 
 function(add_toy toy)
     if(EXISTS ${SRC_DIR}/toys/${toy}.c)

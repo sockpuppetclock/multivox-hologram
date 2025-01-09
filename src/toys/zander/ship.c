@@ -10,6 +10,7 @@
 #include "particles.h"
 #include "terrain.h"
 #include "objects.h"
+#include "input.h"
 
 #define ZFLOAT(f) ((float)((double)((int32_t)f) / (double)(0x01000000)))
 
@@ -90,8 +91,12 @@ void ship_update(float dt) {
         intersection = (intersection_t){false, ~0, ~0};
     }
 
+    vec2_t control_stick;
+    control_stick.x = input_get_axis(0, AXIS_LS_X);
+    control_stick.y = input_get_axis(0, AXIS_LS_Y);
+
     float control_magnitude = vec2_length(control_stick.v);
-    float control_direction = atan2f(control_stick.y, control_stick.x);
+    float control_direction = atan2f(-control_stick.y, control_stick.x);
     
     ship_rotation.y = control_magnitude * ship_pitch_max;
 
@@ -107,6 +112,7 @@ void ship_update(float dt) {
     mat4_identity(matrix);
     mat4_apply_rotation(matrix, ship_rotation.v);
 
+    float control_thrust = input_get_axis(0, AXIS_RT);
     if (control_thrust > 0.0f) {
         float engine[VEC3_SIZE];
         vec3_transform(engine, ship_engine_vector, matrix);
@@ -144,6 +150,7 @@ void ship_update(float dt) {
         ship_velocity.z = fabsf(ship_velocity.z);
     }
 
+    bool control_fire = input_get_button(0, BUTTON_RB, BUTTON_HELD);
     if (control_fire) {
         bullet_time += dt;
 

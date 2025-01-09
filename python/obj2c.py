@@ -60,7 +60,7 @@ if (len(vertices) >= 3):
     for v, vert in enumerate(vertices):
         if ((v % 8) == 0):
             print('\n        ', end='')
-        print(f'{{{vert[0]}, {vert[2]}, {vert[1]}}}, ', end='')
+        print(f'{{{float(vert[0]):g}, {float(vert[2]):g}, {float(vert[1]):g}}}, ', end='')
     print( '\n    },')
     
     print(f'    .surface_count = {len(surfaces)},')

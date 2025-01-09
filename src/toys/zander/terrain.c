@@ -7,6 +7,7 @@
 #include "zander.h"
 #include "zsintable.h"
 #include "particles.h"
+#include "timer.h"
 
 #define SMOOTH_COASTLINE
 #define CHEESY_WAVES
@@ -177,7 +178,7 @@ void draw_ground(pixel_t* volume) {
                     #define WAVE_HEIGHT (0.2f)
                     #define CREST_HEIGHT (WAVE_HEIGHT * 0.95f)
                     float depth = terrain_get_altitude_raw(pos.x, pos.y);
-                    float crest = depth + sinf((((time_now_ms + (int32_t)(pos.y*2000)) % (WAVE_PERIOD_MS * 256)) * 2 * M_PI / WAVE_PERIOD_MS) + depth*depth*16);
+                    float crest = depth + sinf((((timer_frame_time + (int32_t)(pos.y*2000)) % (WAVE_PERIOD_MS * 256)) * 2 * M_PI / WAVE_PERIOD_MS) + depth*depth*16);
                     if (crest > 0) {
                         crest = powf(crest, 0.1f) * WAVE_HEIGHT;
                         if (crest > CREST_HEIGHT) {
