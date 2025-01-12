@@ -27,7 +27,7 @@
 
 static float model_rotation[VEC3_SIZE] = {0, 0, 0};
 static float model_position[VEC3_SIZE] = {0, 0, 0};
-static float model_scale = 10.0f;
+static float model_scale = 1.0f;
 
 static model_style_t wireframe = STYLE_WIREFRAME_IF_UNDEFINED;
 
@@ -40,7 +40,7 @@ typedef enum {
 static navigation_t navigation_style = NAVIGATION_ORBIT;
 
 static void home_pose() {
-    model_scale = 10.0f;
+    model_scale = 1.0f;
     vec3_zero(model_rotation);
     vec3_zero(model_position);
 }
@@ -127,15 +127,6 @@ model_t* load_scene(char* scene) {
     return model;
 }
 
-static void cycle_scene(int direction) {
-    scene_current = (scene_current + direction + scene_count) % scene_count;
-
-    if (scene_current >= 0 && scene_current < scene_count) {
-        model_free(scene_model);
-        scene_model = load_scene(scene_list[scene_current]);
-        home_pose();
-    }
-}
 
 void vox_rotate_z(float angle) {
     pixel_t* src = voxel_buffer_get(VOXEL_BUFFER_BACK);
@@ -217,23 +208,19 @@ void* temperature_worker(void *vargp) {
 
 static const uint8_t combo_quit[] = {BUTTON_MENU, BUTTON_MENU, BUTTON_MENU, BUTTON_MENU, BUTTON_MENU};
 static const uint8_t combo_konami[] = {BUTTON_UP, BUTTON_UP, BUTTON_DOWN, BUTTON_DOWN, BUTTON_LEFT, BUTTON_RIGHT, BUTTON_LEFT, BUTTON_RIGHT, BUTTON_B, BUTTON_A};
-static uint8_t combo_buffer[16] = {~0,~0,~0,~0,~0,~0,~0,~0,~0,~0,~0,~0,~0,~0,~0,~0};
-#define COMBOMATCH(combo) (memcmp(combo_buffer + sizeof(combo_buffer) - sizeof(combo), combo, sizeof(combo)) == 0)
 
 #define DOOMPATH   "/home/pi/development/doom/doomvox/"
 #define DOOMVOXAPP DOOMPATH "doomvox/doomvox"
 #define DOOMVOXWAD DOOMPATH "DOOM1.WAD"
 
-void combo_press(button_t button) {
-    memmove(combo_buffer, combo_buffer+1, sizeof(combo_buffer)-1);
-    combo_buffer[sizeof(combo_buffer)-1] = button;
+static void check_combo(void) {
 
-    if (COMBOMATCH(combo_quit)) {
+    if (input_get_combo(combo_quit, sizeof(combo_quit))) {
         printf("SHUTDOWN!\n");
         system("sudo shutdown -P now");
     }
 
-    if (COMBOMATCH(combo_konami)) {
+    if (input_get_combo(combo_konami, sizeof(combo_konami))) {
         printf("KONAMI!\n");
         pid_t pid = fork();
         if (pid == 0) {
@@ -243,41 +230,6 @@ void combo_press(button_t button) {
             exit(127);
         } else {
             waitpid(pid, 0, 0);
-        }
-    }
-}
-
-static bool dpad[4] = {0,0,0,0};
-void dpad_event(uint8_t axis, int16_t value) {
-    if (axis == 6) {
-        if (value < -24000) {
-            if (!dpad[0]) {
-                combo_press(BUTTON_LEFT);
-                dpad[0] = true;
-            }
-        } else if (value > 24000) {
-            if (!dpad[1]) {
-                combo_press(BUTTON_RIGHT);
-                dpad[1] = true;
-            }
-        } else if (value > -8192 && value < 8192) {
-            dpad[0] = 0;
-            dpad[1] = 0;
-        }
-    } else if (axis == 7) {
-        if (value < -24000) {
-            if (!dpad[2]) {
-                combo_press(BUTTON_UP);
-                dpad[2] = true;
-            }
-        } else if (value > 24000) {
-            if (!dpad[3]) {
-                combo_press(BUTTON_DOWN);
-                dpad[3] = true;
-            }
-        } else if (value > -8192 && value < 8192) {
-            dpad[2] = 0;
-            dpad[3] = 0;
         }
     }
 }
@@ -298,17 +250,16 @@ int main(int argc, char** argv) {
         } while (!voxel_buffer_map());
     }
 
-    cycle_scene(0);
-
-    int js = -1;
-    struct js_event event;
+    scene_current = 0;
+    scene_model = load_scene(scene_list[scene_current]);
+    home_pose();
 
     mfloat_t centre[VEC3_SIZE] = {VOXELS_X / 2, VOXELS_Y / 2, VOXELS_Z / 2};
 
     float dscale = 0.0f;
     float deuler[VEC3_SIZE] = {0, 0, 0};
     float doffset[VEC3_SIZE] = {0, 0, 0};
-float matrix[MAT4_SIZE];
+    float matrix[MAT4_SIZE];
 #ifdef SHOW_STATS
     int perf = 0;
 
@@ -320,6 +271,9 @@ float matrix[MAT4_SIZE];
     home_pose();
     input_set_nonblocking();
 
+    int scene_target = scene_current;
+    bool scene_reload = false;
+
     for (int ch = 0; ch != 27; ch = getchar()) {
 
         switch (ch) {
@@ -328,10 +282,10 @@ float matrix[MAT4_SIZE];
             } break;
 
             case '[': {
-                cycle_scene( 1);
+                scene_target += 1;
             } break;
             case ']': {
-                cycle_scene(-1);
+                scene_target -= 1;
             } break;
 
             case 'h': {
@@ -377,114 +331,70 @@ float matrix[MAT4_SIZE];
             } break;
         }
 
-        if (js == -1) {
-            js = open("/dev/input/js0", O_RDONLY | O_NONBLOCK);
-        } else {
-            ssize_t events;
-            while ((events = read(js, &event, sizeof(event))) > 0) {
-                if (event.type == JS_EVENT_BUTTON) {
-                    if (event.value) {
-                        combo_press(event.number);
-                        switch (event.number) {
-                            case BUTTON_A:
-                                navigation_style = (navigation_style + 1) % NAVIGATION_COUNT;
-                                home_pose();
-                                break;
+        input_update();
+        check_combo();
 
-                            case BUTTON_X:
-                                zoom_to_fit();
-                                break;
-
-                            case BUTTON_Y:
-                                wireframe = (wireframe + 1) % STYLE_COUNT;
-                                cycle_scene(0);
-                                break;
-
-                            case BUTTON_LB:
-                                cycle_scene(-1);                            
-                                break;
-
-                            case BUTTON_RB:
-                                cycle_scene( 1);
-                                break;
-
-                            case BUTTON_VIEW:
-                                voxel_buffer->bpc = (voxel_buffer->bpc % 3) + 1;
-                                break;
-                            
-                            default:
-                                printf("Button %u %s\n", event.number, event.value ? "pressed" : "released");
-                                break;
-                        }
-                    }
-                    //printf("Button %u %s\n", event.number, event.value ? "pressed" : "released");
-                } else if (event.type == JS_EVENT_AXIS) {
-                    if (event.number == AXIS_D_X || event.number == AXIS_D_Y) {
-                        dpad_event(event.number, event.value);
-                    } else {
-                        if (event.value > 16384) {
-                            combo_buffer[sizeof(combo_buffer)-1] = ~0;
-                        }
-                    }
-
-                    switch (navigation_style) {
-                        case NAVIGATION_ORBIT: {
-                            switch (event.number) {
-                                case AXIS_LS_X: deuler[2] = (float)event.value * (-0.1f / 32767.0f); break;
-                                case AXIS_LS_Y: deuler[0] = (float)event.value * ( 0.1f / 32767.0f); break;
-                                case AXIS_RS_X: deuler[1] = (float)event.value * ( 0.1f / 32767.0f); break;
-                                
-                                case AXIS_RS_Y: doffset[2] = (float)event.value * (-1.0f / 32767.0f); break;
-                                
-                                case AXIS_LT:
-                                case AXIS_RT: {
-                                    float delta = (float)(event.value + 32000) / 64000.0f;
-                                    delta = min(max(0.0f, delta), 1.0f);
-                                    dscale = delta * (event.number == AXIS_RT ? -0.1f : 0.1f);
-                                } break;
-
-                                case AXIS_D_X: doffset[0] = (float)event.value * ( 3.0f / 32767.0f); break;
-                                case AXIS_D_Y: doffset[1] = (float)event.value * (-3.0f / 32767.0f); break;
-
-                                default:
-                                    break;
-                            }
-                        } break;
-
-                        default:
-                        case NAVIGATION_WALKTHROUGH: {
-                            switch (event.number) {
-                                case AXIS_RS_X: deuler[2] = (float)event.value * (0.1f / 32767.0f); break;
-
-                                case AXIS_LS_Y: doffset[1] = (float)event.value * (( 5.0f / 32767.0f) / model_scale); break;
-                                case AXIS_LS_X: doffset[0] = (float)event.value * ((-5.0f / 32767.0f) / model_scale); break;
-                                case AXIS_RS_Y: {
-                                    int dead = max(0, abs(event.value) - 8192) * (event.value > 0 ? 1 : -1);
-                                    doffset[2] = (float)dead * (( 4.0f / 32767.0f) / model_scale);
-                                } break;
-                                
-                                case AXIS_LT:
-                                case AXIS_RT: {
-                                    float delta = (float)(event.value + 32000) / 64000.0f;
-                                    delta = min(max(0.0f, delta), 1.0f);
-                                    dscale = delta * (event.number == AXIS_RT ? -0.1f : 0.1f);
-                                } break;
-
-
-                                default:
-                                    break;
-                            }
-                        } break;
-                    }
-                } else {
-                    //printf("event type %d\n", event.type);
-                }
-            }
-            if (events < 0 && errno != EAGAIN) {
-                close(js);
-                js = -1;
-            }
+        if (input_get_button(0, BUTTON_A, BUTTON_PRESSED)) {
+            navigation_style = (navigation_style + 1) % NAVIGATION_COUNT;
+            home_pose();
         }
+
+        if (input_get_button(0, BUTTON_X, BUTTON_PRESSED)) {
+            zoom_to_fit();
+        }
+
+        if (input_get_button(0, BUTTON_Y, BUTTON_PRESSED)) {
+            wireframe = (wireframe + 1) % STYLE_COUNT;
+            scene_reload = true;
+        }
+
+        if (input_get_button(0, BUTTON_LB, BUTTON_PRESSED)) {
+            scene_target -= 1;
+        }
+
+        if (input_get_button(0, BUTTON_RB, BUTTON_PRESSED)) {
+            scene_target += 1;
+        }
+
+        if (input_get_button(0, BUTTON_VIEW, BUTTON_PRESSED)) {
+            voxel_buffer->bpc = (voxel_buffer->bpc % 3) + 1;
+        }
+
+        scene_target = modulo(scene_target, scene_count);
+        if (scene_current != scene_target || scene_reload) {
+            scene_current = scene_target;
+
+            model_free(scene_model);
+            scene_model = load_scene(scene_list[scene_current]);
+            home_pose();
+        }
+
+        switch (navigation_style) {
+            case NAVIGATION_ORBIT: {
+                deuler[2] = input_get_axis(0, AXIS_LS_X) * -0.1f;
+                deuler[0] = input_get_axis(0, AXIS_LS_Y) *  0.1f;
+                deuler[1] = input_get_axis(0, AXIS_RS_X) *  0.1f;
+                    
+                dscale = (input_get_axis(0, AXIS_LT) - input_get_axis(0, AXIS_RT)) * 0.1f;
+
+                doffset[0] = input_get_axis(0, AXIS_D_X) *  3.0f;
+                doffset[1] = input_get_axis(0, AXIS_D_Y) * -3.0f;
+                doffset[2] = input_get_axis(0, AXIS_RS_Y) * -1.0f;
+            } break;
+
+            default:
+            case NAVIGATION_WALKTHROUGH: {
+                deuler[2] = input_get_axis(0, AXIS_RS_X) * 0.1f;
+
+                doffset[1] = input_get_axis(0, AXIS_LS_Y) *  5.0f / model_scale;
+                doffset[0] = input_get_axis(0, AXIS_LS_X) * -5.0f / model_scale;
+                doffset[2] = input_get_axis(0, AXIS_RS_Y) *  4.0f / model_scale;
+                    
+                dscale = (input_get_axis(0, AXIS_LT) - input_get_axis(0, AXIS_RT)) * 0.1f;
+            } break;
+        }
+
+
 
         mat4_identity(matrix);
 
@@ -552,10 +462,6 @@ float matrix[MAT4_SIZE];
     monitor_temperature = false;
     pthread_join(temperature_thread, NULL);
 #endif
-
-    if (js > -1) {
-        close(js);
-    }
 
     voxel_buffer_unmap();
 

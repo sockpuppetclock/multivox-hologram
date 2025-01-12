@@ -14,15 +14,15 @@ uint32_t timer_delta_time = 100;
 
 [[maybe_unused]] struct timespec timer_start, timer_frame_curr, timer_frame_prev, timer_prof;
 
-static int32_t diff_timespec_ms(struct timespec to, struct timespec from) {
+static int32_t diff_timespec_ms(const struct timespec* to, const struct timespec* from) {
     struct timespec diff;
 
-    if ((to.tv_nsec - from.tv_nsec) < 0) {
-        diff.tv_sec = to.tv_sec - from.tv_sec - 1;
-        diff.tv_nsec = 1000000000 + to.tv_nsec - from.tv_nsec;
+    if ((to->tv_nsec - from->tv_nsec) < 0) {
+        diff.tv_sec = to->tv_sec - from->tv_sec - 1;
+        diff.tv_nsec = 1000000000 + to->tv_nsec - from->tv_nsec;
     } else {
-        diff.tv_sec = to.tv_sec - from.tv_sec;
-        diff.tv_nsec = to.tv_nsec - from.tv_nsec;
+        diff.tv_sec = to->tv_sec - from->tv_sec;
+        diff.tv_nsec = to->tv_nsec - from->tv_nsec;
     }
 
     return (diff.tv_sec * 1000) + (diff.tv_nsec / 1000000);
@@ -38,7 +38,6 @@ static void add_timespec_ms(struct timespec* time, int ms) {
 }
 
 void timer_init() {
-
     clock_gettime(CLOCK_REALTIME, &timer_start);
     timer_frame_curr = timer_frame_prev = timer_start;
 }
@@ -47,10 +46,10 @@ void timer_tick() {
     ++timer_frame_count;
 
     clock_gettime(CLOCK_REALTIME, &timer_frame_curr);
-    int ms_elapsed = diff_timespec_ms(timer_frame_curr, timer_frame_prev);
+    int ms_elapsed = diff_timespec_ms(&timer_frame_curr, &timer_frame_prev);
     timer_frame_prev = timer_frame_curr;
 
-    timer_frame_time = diff_timespec_ms(timer_frame_curr, timer_start);
+    timer_frame_time = diff_timespec_ms(&timer_frame_curr, &timer_start);
     
     timer_delta_time = clamp(ms_elapsed, 1, 100);
 }

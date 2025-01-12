@@ -10,6 +10,9 @@ struct image_s;
 float* vec3_transform(float* result, const float* v0, const float* m0);
 float* mat4_apply_scale(float* result, float s);
 float* mat4_apply_translation(float* result, const float* v0);
+float* mat4_apply_rotation_x(float* result, float angle);
+float* mat4_apply_rotation_y(float* result, float angle);
+float* mat4_apply_rotation_z(float* result, float angle);
 float* mat4_apply_rotation(float* result, const float* euler);
 
 typedef void (*graphics_draw_voxel_cb_t)(pixel_t* volume, const int* coordinate, pixel_t colour);
