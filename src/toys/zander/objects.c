@@ -385,7 +385,7 @@ void objects_draw(pixel_t* volume) {
 
     float world[MAT4_SIZE];
     mat4_identity(world);
-    mat4_apply_translation(world, (float[3]){VOXELS_X/2, VOXELS_Y/2, 0});
+    mat4_apply_translation(world, (float[3]){(VOXELS_X-1)*0.5f, (VOXELS_Y-1)*0.5f, 0});
     mat4_apply_scale(world, world_scale);
     mat4_apply_translation(world, (float[3]){-world_position.x, -world_position.y, -world_position.z});
 

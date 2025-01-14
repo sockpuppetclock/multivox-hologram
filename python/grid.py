@@ -18,7 +18,7 @@ shm_fd = os.open("/dev/shm/rotovox_double_buffer", os.O_RDWR)
 shm_mm = mmap.mmap(shm_fd, ctypes.sizeof(voxel_double_buffer_t), mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
 buffer = voxel_double_buffer_t.from_buffer(shm_mm)
 
-buffer.bpc = 1
+#buffer.bpc = 1
 
 for z in range(voxels_z):
     for x in range(voxels_x):

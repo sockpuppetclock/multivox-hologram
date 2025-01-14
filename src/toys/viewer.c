@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
     scene_model = load_scene(scene_list[scene_current]);
     home_pose();
 
-    mfloat_t centre[VEC3_SIZE] = {VOXELS_X / 2, VOXELS_Y / 2, VOXELS_Z / 2};
+    mfloat_t centre[VEC3_SIZE] = {(VOXELS_X-1)*0.5f, (VOXELS_Y-1)*0.5f, (VOXELS_Z-1)*0.5f};
 
     float dscale = 0.0f;
     float deuler[VEC3_SIZE] = {0, 0, 0};
@@ -277,10 +277,6 @@ int main(int argc, char** argv) {
     for (int ch = 0; ch != 27; ch = getchar()) {
 
         switch (ch) {
-            case 'b': {
-                voxel_buffer->bpc = (voxel_buffer->bpc % 3) + 1;
-            } break;
-
             case '[': {
                 scene_target += 1;
             } break;
@@ -354,10 +350,6 @@ int main(int argc, char** argv) {
 
         if (input_get_button(0, BUTTON_RB, BUTTON_PRESSED)) {
             scene_target += 1;
-        }
-
-        if (input_get_button(0, BUTTON_VIEW, BUTTON_PRESSED)) {
-            voxel_buffer->bpc = (voxel_buffer->bpc % 3) + 1;
         }
 
         scene_target = modulo(scene_target, scene_count);

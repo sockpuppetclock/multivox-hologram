@@ -537,8 +537,8 @@ model_t* model_load_image(const char* filename) {
     model_t* model = (model_t*)malloc(sizeof(model_t));
     memset(model, 0, sizeof(*model));
 
-    float sx = 6.4;
-    float sy = 6.4;
+    float sx = 64;
+    float sy = 64;
 
     image_t* image = image_load(filename);
     if (image) {
@@ -605,7 +605,6 @@ void model_draw(pixel_t* volume, const model_t* model, float* matrix) {
     vec3_t* transformed = scratch_positions.data;
     for (uint i = 0; i < model->vertex_count; ++i) {
         vec3_transform(transformed[i].v, model->vertices[i].position.v, matrix);
-        vec3_add(transformed[i].v, transformed[i].v, (float[3]){0.5f, 0.5f, 0.5f});
     }
 
     for (uint i = 0; i < model->edge_count; ++i) {

@@ -20,7 +20,9 @@
 #define CHECK_BOUNDS
 
 graphics_draw_voxel_cb_t graphics_draw_voxel_cb = NULL;
+
 #ifdef TRIANGLE_DITHER
+//some content looks better if we break up the stairstepping on shallow triangles
 float graphics_triangle_fuzz = 0.25f;
 #endif
 
@@ -224,9 +226,9 @@ static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1
                                                 const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
 
     int pos[VEC3_SIZE] = {
-        (int)floorf((v0[0] + v1[0] + v2[0]) * (1.0f/3.0f) + 0.5f),
-        (int)floorf((v0[1] + v1[1] + v2[1]) * (1.0f/3.0f) + 0.5f),
-        (int)floorf((v0[2] + v1[2] + v2[2]) * (1.0f/3.0f) + 0.5f),
+        (int)roundf((v0[0] + v1[0] + v2[0]) * (1.0f/3.0f)),
+        (int)roundf((v0[1] + v1[1] + v2[1]) * (1.0f/3.0f)),
+        (int)roundf((v0[2] + v1[2] + v2[2]) * (1.0f/3.0f)),
     };
 
     if (pos[0] < 0 || pos[1] < 0 || pos[2] < 0
@@ -251,6 +253,10 @@ static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1
 
 void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2, pixel_t colour,
                                              const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
+
+    // Render a triangle as voxels. This is identical to 2D triangle rasterisation, viewed along the axis closest
+    // to the face normal.
+
     float inf[VEC3_SIZE] = {
         fminf(fminf(v0[0], v1[0]), v2[0]),
         fminf(fminf(v0[1], v1[1]), v2[1]),
@@ -299,8 +305,6 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
     vec3_min(sup, sup, voxmax);
     vec3_add(sup, sup, voxoff);
 
-
-
     #define ORIENT2D(a, b, c) (((b)[xchannel] - (a)[xchannel]) * ((c)[ychannel] - (a)[ychannel]) - ((b)[ychannel] - (a)[ychannel]) * ((c)[xchannel] - (a)[xchannel]))
 
     float dx[VEC3_SIZE] = {v1[ychannel] - v2[ychannel], v2[ychannel] - v0[ychannel], v0[ychannel] - v1[ychannel]};
@@ -322,7 +326,7 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
 
     int xrange = (int)(sup[xchannel] - inf[xchannel] + 1.5f);
     int yrange = (int)(sup[ychannel] - inf[ychannel] + 1.5f);
-    const int voxels_z = (int[3]){VOXELS_X, VOXELS_Y, VOXELS_Z}[zchannel];
+    const uint voxels_z = (uint[3]){VOXELS_X, VOXELS_Y, VOXELS_Z}[zchannel];
 
     int voxel[VEC3_SIZE];
     voxel[ychannel] = (int)floorf(inf[ychannel]);
@@ -343,9 +347,9 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
                 const float dither = 0;
 #endif
                 voxel[zchannel] = (int)floorf(v0[zchannel] * w[0] + v1[zchannel] * w[1] + v2[zchannel] * w[2] + dither);
-                if (voxel[zchannel] >= 0 && voxel[zchannel] < voxels_z) {
+                if ((uint)voxel[zchannel] < voxels_z) {
 #ifdef CHECK_BOUNDS
-                    if (voxel[0] < 0 || voxel[0] >= VOXELS_X || voxel[1] < 0 || voxel[1] >= VOXELS_Y ||voxel[2] < 0 || voxel[2] >= VOXELS_Z) {
+                    if ((uint)voxel[0] >= VOXELS_X || (uint)voxel[1] >= VOXELS_Y || (uint)voxel[2] >= VOXELS_Z) {
                         printf("bwart\n");
                         voxel[0] &= (VOXELS_X-1);
                         voxel[1] &= (VOXELS_Y-1);

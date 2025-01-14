@@ -1,21 +1,16 @@
-#define _GNU_SOURCE
 #include "carousel.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <linux/joystick.h>
 
+#include "multivox.h"
 #include "model.h"
 #include "input.h"
 #include "rammel.h"
 #include "timer.h"
-
-#define CART_SLOTS 7
+#include "cart.h"
 
 static model_t cart_model = {
     .vertex_count = 24,
@@ -35,15 +30,6 @@ static model_t cart_model = {
     },
 };
 
-typedef struct {
-    const char* command;
-    const char* arguments;
-    const char* workingdir;
-    const char* environment;
-
-    pixel_t colour;
-} cart_t;
-
 static cart_t carts[] = {
     {
         .colour = RGBPIX(255,255,0),
@@ -57,6 +43,10 @@ static cart_t carts[] = {
     {
         .colour = RGBPIX(0,255,0),
         .command = "/home/pi/development/multivox/build/zander",
+    },
+    {
+        .colour = RGBPIX(0,128,128),
+        .command = "/home/pi/development/multivox/build/flight",
     },
     {
         .colour = RGBPIX(0,0,255),
@@ -75,151 +65,17 @@ static cart_t carts[] = {
 
 static uint cart_count = count_of(carts);
 
-typedef struct {
-    uint32_t cart_id;
-    pid_t process_id;
-
-} cart_context_t;
-
-static cart_context_t cart_context = {.process_id = -1};
-
 static int selection_target;
 static float selection_current;
 
-
-static bool background_process() {
-    input_update();
-
-    if (input_get_button(0, BUTTON_VIEW, BUTTON_PRESSED)) {
-        return false;
-    }
-
-    usleep(100000);
-
-    return true;
-}
-
-static void background_loop(pid_t pid) {
-    int status;
-
-    while (true) {
-        pid_t result = waitpid(pid, &status, WNOHANG);
-
-        if (result == 0) {
-            if (!background_process()) {
-                printf("suspend\n");
-                if (kill(cart_context.process_id, SIGSTOP) == 0) {
-                    break;
-                } else {
-                    perror("suspend");
-                }
-            }
-
-        } else if (result == -1) {
-            perror("waitpid");
-            break;
-            
-        } else {
-            if (WIFEXITED(status)) {
-                printf("Child process exited with status %d\n", WEXITSTATUS(status));
-
-            } else if (WIFSIGNALED(status)) {
-                printf("Child process killed by signal %d\n", WTERMSIG(status));
-
-            }
-            break;
-        }
-    }
-}
-
-static void cart_execute(uint32_t cart_id) {
-    static uint32_t nospam = 0;
-    if ((timer_frame_count - nospam) < 10) {
-        printf("nospam\n");
-        return;
-    }
-    nospam = timer_frame_count;
-
-    if (cart_id >= cart_count) {
-        return;
-    }
-    cart_t* cart = &carts[cart_id];
-    if (!cart->command) {
-        return;
-    }
-
-    #define IF_STRING(str) ((str) ? (str) : "")
-    printf("cartecute %s %s %s\n", IF_STRING(cart->command), IF_STRING(cart->workingdir), IF_STRING(cart->environment));
-
-    if (cart_context.process_id > 0) {
-        if (cart_context.cart_id == cart_id) {
-            printf("resume\n");
-            if (kill(cart_context.process_id, SIGCONT) == 0) {
-                background_loop(cart_context.process_id);
-                return;
-            }
-            perror("process");
-        }
-
-        printf("kill\n");
-        kill(cart_context.process_id, SIGKILL);
-    }
-
-    pid_t pid = fork();
-    cart_context.process_id = pid;
-    cart_context.cart_id = cart_id;
-
-    printf("pid %d\n", pid);
-
-    if (pid == -1) {
-        perror("fork");
-        return;
-    }
-
-    if (pid > 0) {
-        background_loop(pid);
-
-    } else {
-        //execute the cart
-
-        if (cart->workingdir) {
-            chdir(cart->workingdir);
-        }
-
-        size_t argslen = cart->arguments ? strlen(cart->arguments) : 0;
-        size_t envslen = cart->environment ? strlen(cart->environment) : 0;
-        char items[max(argslen, envslen) + 1];
-
-        char* args[argslen / 2 + 2];
-        int a = 0;
-        args[a++] = (char*)cart->command;
-        if (argslen > 0) {
-            strcpy(items, cart->arguments);
-            char* arg = strtok(items, " ");
-            while (arg) {
-                args[a++] = arg;
-                arg = strtok(NULL, " ");
-            }
-        }
-        args[a] = NULL;
-
-        char *envs[envslen / 2 + 1];
-        int e = 0;
-        if (envslen > 0) {
-            strcpy(items, (char*)cart->environment);
-            char* env = strtok(items, " ");
-            while (env) {
-                envs[e++] = env;
-                env = strtok(NULL, " ");
-            }
-        }
-        envs[e] = NULL;
-
-        execvpe(cart->command, args, envs);
-        exit(0);
-    }
-    
-}
+typedef enum {
+    STATE_NOMINAL,
+    STATE_INSERTING,
+    STATE_EJECTING,
+    STATE_PAUSING,
+    STATE_UNPAUSING,
+    STATE_FAILED
+} state_t;
 
 
 void carousel_init() {
@@ -245,14 +101,27 @@ void carousel_update(float dt) {
     }
 
     if (input_get_button(0, BUTTON_VIEW, BUTTON_PRESSED)) {
-        if (cart_context.process_id > 0) {
-            cart_execute(cart_context.cart_id);
-        }
+        cart_action_t action = multivox_cart_resume();
+
+
+        return;
+    }
+    
+    if (input_get_button(0, BUTTON_A, BUTTON_PRESSED)) {
+        cart_action_t action = multivox_cart_execute(&carts[selection_target]);
+
+
+        return;
     }
 
-    if (input_get_button(0, BUTTON_A, BUTTON_PRESSED)) {
-        cart_execute(selection_target);
+
+    if (input_get_button(0, BUTTON_UP, BUTTON_PRESSED)) {
+        voxel_buffer->bpc = clamp(voxel_buffer->bpc + 1, 1, 3);
     }
+    if (input_get_button(0, BUTTON_DOWN, BUTTON_PRESSED)) {
+        voxel_buffer->bpc = clamp(voxel_buffer->bpc - 1, 1, 3);
+    }
+
 
 }
 
@@ -274,7 +143,7 @@ void carousel_draw(pixel_t* volume) {
         float angle =  atan((i - smooth) * 0.5f) * 2; 
 
         mat4_identity(matrix);
-        mat4_apply_translation(matrix, (float[3]){VOXELS_X/2, VOXELS_Y/2, 0});
+        mat4_apply_translation(matrix, (float[3]){(VOXELS_X-1)*0.5f, (VOXELS_Y-1)*0.5f, 0});
         mat4_apply_rotation_z(matrix, angle);
         mat4_apply_translation(matrix, (float[3]){40.0f, 4.0f, slot_height(angle)});
 

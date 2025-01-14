@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
         step_tiles();
     }
 
-    float volume_centre[VEC3_SIZE] = {VOXELS_X/2, VOXELS_Y/2, VOXELS_Z/2};
+    float volume_centre[VEC3_SIZE] = {(VOXELS_X-1)*0.5f, (VOXELS_Y-1)*0.5f, (VOXELS_Z-1)*0.5f};
     float world_rotation[VEC3_SIZE] = {0, 0, 0};
     float world_position[VEC3_SIZE] = {0, 0, 0};
 

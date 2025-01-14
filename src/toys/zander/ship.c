@@ -53,7 +53,7 @@ static const float ship_bullet_speed = 8.0f;
 static const float ship_damping = 0.8f;
 
 
-static const float ship_undercarriage = 0.390625f;
+static const float ship_undercarriage = 0.5f;
 
 vec3_t ship_position = {.x = 3.5f, .y = 3.5f, .z = 2 + ship_undercarriage};
 vec3_t ship_rotation = {.x=0, .y=0, .z=0};
@@ -210,7 +210,7 @@ void ship_draw(pixel_t* volume) {
     vec3_subtract(position, ship_position.v, world_position.v);
 
     mat4_identity(matrix);
-    mat4_apply_translation(matrix, (float[3]){VOXELS_X/2, VOXELS_Y/2, 0});
+    mat4_apply_translation(matrix, (float[3]){(VOXELS_X-1)*0.5f, (VOXELS_Y-1)*0.5f, 0});
     mat4_apply_scale(matrix, world_scale);
     mat4_apply_translation(matrix, position);
     mat4_apply_rotation(matrix, ship_rotation.v);
