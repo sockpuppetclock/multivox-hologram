@@ -149,8 +149,8 @@ static bool handle_keys() {
             return false;
 
         case 'b': {
-            volume_buffer->bpc = (volume_buffer->bpc % 3) + 1;
-            printf("%d bpc\n", volume_buffer->bpc);
+            volume_buffer->bits_per_channel = (volume_buffer->bits_per_channel % 3) + 1;
+            printf("%d bpc\n", volume_buffer->bits_per_channel);
         } break;
 
         case 'u': {
@@ -208,12 +208,6 @@ static bool handle_keys() {
 
 #endif
 
-static inline bool in_cylinder(int x, int y) {
-    x = (x * 2) - (VOXELS_X - 1);
-    y = (y * 2) - (VOXELS_Y - 1);
-    int rsq = x * x + y * y;
-    return rsq <= (VOXELS_X * VOXELS_X + VOXELS_Y * VOXELS_Y);
-}
 
 typedef const pixel_t* scanline_stack_t[TRAIL_STACK][PANEL_COUNT][PANEL_MULTIPLEX];
 
@@ -499,7 +493,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    buffer->bpc = 2;
+    buffer->bits_per_channel = 2;
 
     rotation_init();
     reset_panels();
@@ -541,7 +535,7 @@ int main(int argc, char** argv) {
 
         // we unblank the previous row while we're shifting in the new row. This lookup defines
         // how late that unblank happens to vary the brightness for BCM
-        const int bpc = min(max(1, buffer->bpc), BPC_MAX);
+        const int bpc = min(max(1, buffer->bits_per_channel), BPC_MAX);
         const int gamma[BPC_MAX] = {PANEL_WIDTH-120, PANEL_WIDTH-60, PANEL_WIDTH-30};
         int unblank[3] = {};
         for (int b = 0; b < bpc; ++b) {
@@ -600,6 +594,10 @@ int main(int argc, char** argv) {
                     gpio_clear_bits(((~rgbbits) & RGB_BITS_MASK) | RGB_CLOCK_MASK | ((c==unblank[b]) << RGB_BLANK));
                     gpio_set_bits(rgbbits & RGB_BITS_MASK);
                     
+//tiny_wait(400); //60
+//tiny_wait(200); //120
+//tiny_wait(90); //240
+//tiny_wait(40); //480
                     tiny_wait((CLOCK_WAITS  )/2);
 
                     gpio_set_pin(RGB_CLOCK);
@@ -626,15 +624,15 @@ int main(int argc, char** argv) {
 #endif
         }
 
-        buffer->rpds = rotation_stopped ? 0 : min(255, 10000000 / rotation_period);
+        buffer->revolutions_per_minute = rotation_stopped ? 0 : 60000000 / rotation_period;
         
 #ifdef DEVELOPMENT_FEATURES
         if (interactive) {
             perf_period += *timer_uS - frame_start;
             if (perf_count >= 4096) {
-                buffer->fpcs = min(255, perf_count*10000 / perf_period);
+                buffer->microseconds_per_frame = perf_period / perf_count;
                 uint revs = 100000000 / rotation_period;
-                printf("%u uS/frame %u frame/S    %u.%02u revs/S %u rpm\n", perf_period / perf_count, perf_count*1000000 / perf_period, revs/100, revs%100, (revs * 6) / 10);
+                printf("%u uS/frame   %u frame/S      %u.%02u revs/S   %u rpm\n", perf_period / perf_count, perf_count*1000000 / perf_period, revs/100, revs%100, (revs * 6) / 10);
                 perf_count = 0;
                 perf_period = 0;
             }

@@ -86,12 +86,25 @@ static inline int VOXEL_INDEX(int x, int y, int z) {
 #define VOXEL_FIELD_STRIDE (PANEL_FIELD_HEIGHT * VOXEL_Z_STRIDE)
 #endif
 
+enum {
+    VORTEX_BRIGHTNESS_UNIFORM =   0x0000,
+    VORTEX_BRIGHTNESS_OVERDRIVE = 0x0001,
+    VORTEX_BRIGHTNESS_SATURATE =  0x0002,
+    VORTEX_BRIGHTNESS_MASK =      0x0003,
+    VORTEX_DISABLE_PANEL_0 =      0x0004,
+    VORTEX_DISABLE_PANEL_1 =      0x0008,
+    VORTEX_DISABLE_TRAILS =       0x0010,
+    VORTEX_STOP_AXIS_VERTICAL =   0x0020,
+    VORTEX_ROTISSERIE =           0x0040
+};
+
 typedef struct {
     pixel_t volume[2][VOXELS_COUNT];
     uint8_t page;
-    uint8_t bpc;
-    uint8_t rpds; //revolutions per decasecond
-    uint8_t fpcs; //frames per centisecond
+    uint8_t bits_per_channel;
+    uint16_t debug_flags;
+    uint16_t revolutions_per_minute;
+    uint16_t microseconds_per_frame;
 } voxel_double_buffer_t;
 
 typedef enum {
@@ -100,6 +113,12 @@ typedef enum {
 } VOXEL_BUFFER_T;
 
 extern voxel_double_buffer_t* voxel_buffer;
+
+static inline bool voxel_in_cylinder(int x, int y) {
+    x = (x * 2) - (VOXELS_X - 1);
+    y = (y * 2) - (VOXELS_Y - 1);
+    return (x * x + y * y) <= (((VOXELS_X + VOXELS_Y) / 2) * ((VOXELS_X + VOXELS_Y) / 2));
+}
 
 bool voxel_buffer_map(void);
 void voxel_buffer_unmap(void);

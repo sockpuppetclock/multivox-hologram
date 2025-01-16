@@ -9,8 +9,10 @@
 #include "particles.h"
 #include "timer.h"
 
+#define STEEP_SLOPES
 #define SMOOTH_COASTLINE
 #define CHEESY_WAVES
+//#define HEIGHT_DITHER
 
 static const int32_t TILE_SIZE = 0x01000000;
 static const int32_t LAND_MID_HEIGHT = 0x05000000;

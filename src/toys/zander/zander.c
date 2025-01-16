@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    volume_buffer->bpc = 2;
+    volume_buffer->bits_per_channel = 2;
 
     main_init();
 

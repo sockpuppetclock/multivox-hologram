@@ -11,8 +11,9 @@ class voxel_double_buffer_t(ctypes.Structure):
     _fields_ = [("buffers", ctypes.c_uint8 * voxels_z * voxels_x * voxels_y * 2),
                 ("page", ctypes.c_uint8),
                 ("bpc",  ctypes.c_uint8),
-                ("rpds", ctypes.c_uint8),
-                ("fpcs", ctypes.c_uint8)]
+                ("flags",  ctypes.c_uint16),
+                ("rpm", ctypes.c_uint16),
+                ("uspf", ctypes.c_uint16)]
     
 shm_fd = os.open("/dev/shm/rotovox_double_buffer", os.O_RDWR)
 shm_mm = mmap.mmap(shm_fd, ctypes.sizeof(voxel_double_buffer_t), mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)

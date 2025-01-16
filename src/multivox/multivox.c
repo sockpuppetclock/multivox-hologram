@@ -81,6 +81,62 @@ typedef struct {
 
 static cart_context_t cart_context = {.process_id = -1};
 
+static void grab_volume(cart_t* cart) {
+    if (!cart->voxel_shot[0]) {
+        cart->voxel_shot[0] = malloc(VOXELS_COUNT * sizeof(pixel_t));
+        memset(cart->voxel_shot[0], 0, VOXELS_COUNT * sizeof(pixel_t));
+    }
+
+    pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_FRONT);
+    for (int y = 0; y < VOXELS_Y; ++y) {
+        for (int x = 0; x < VOXELS_X; ++x) {
+            if (voxel_in_cylinder(x, y)) {
+                for (int z = 0; z < VOXELS_Z; ++z) {
+                    cart->voxel_shot[0][x * VOXELS_Z + y * VOXELS_X * VOXELS_Z + z] = volume[VOXEL_INDEX(x, y, z)];
+                }
+            }
+        }
+    }
+
+    int count[3] = {VOXELS_X, VOXELS_Y, VOXELS_Z};
+    for (int m = 1; m < count_of(cart->voxel_shot); ++m) {
+        count[0] /= 2;
+        count[1] /= 2;
+        count[2] /= 2;
+
+        if (!cart->voxel_shot[m]) {
+            cart->voxel_shot[m] = malloc(count[0] * count[1] * count[2] * sizeof(pixel_t));
+            memset(cart->voxel_shot[m], 0, count[0] * count[1] * count[2] * sizeof(pixel_t));
+        }
+
+        for (int y = 0; y < count[1]; ++y) {
+            for (int x = 0; x < count[0]; ++x) {
+                for (int z = 0; z < count[2]; ++z) {
+
+                    int rgb[3] = {0,0,0};
+                    for (int j = 0; j < 2; ++j) {
+                        for (int i = 0; i < 2; ++i) {
+                            for (int k = 0; k < 2; ++k) {
+                                pixel_t colour = cart->voxel_shot[m - 1][((x*2+i) * count[2]*2) + ((y*2+j) * count[0]*count[2]*4) + (z*2+k)];
+                                rgb[0] += R_PIX(colour);
+                                rgb[1] += G_PIX(colour);
+                                rgb[2] += B_PIX(colour);
+                            }
+                        }
+                    }
+
+                    rgb[0] = min(255, rgb[0] / 3);
+                    rgb[1] = min(255, rgb[1] / 3);
+                    rgb[2] = min(255, rgb[2] / 3);
+
+                    cart->voxel_shot[m][(x * count[2]) + (y * count[0]*count[2]) + (z)] = RGBPIX(rgb[0], rgb[1], rgb[2]);
+                }
+            }
+        }
+    }
+
+}
+
 static bool background_process() {
     input_update();
 
@@ -103,6 +159,7 @@ static cart_action_t background_loop(pid_t pid) {
             if (!background_process()) {
                 //printf("suspend\n");
                 if (kill(cart_context.process_id, SIGSTOP) == 0) {
+                    grab_volume(cart_context.cart);
                     return CART_ACTION_PAUSE;
 
                 } else {
@@ -123,6 +180,7 @@ static cart_action_t background_loop(pid_t pid) {
 
             }
 
+            grab_volume(cart_context.cart);
             return CART_ACTION_EJECT;
         }
     }
