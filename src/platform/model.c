@@ -602,6 +602,8 @@ void model_draw(pixel_t* volume, const model_t* model, float* matrix) {
     }
     scratch_positions.count = 0;
 
+    //clock_t time_start = clock();
+
     vec3_t* transformed = scratch_positions.data;
     for (uint i = 0; i < model->vertex_count; ++i) {
         vec3_transform(transformed[i].v, model->vertices[i].position.v, matrix);
@@ -627,6 +629,7 @@ void model_draw(pixel_t* volume, const model_t* model, float* matrix) {
         }
     }
 
+    //printf("%ld ms\n", (clock() - time_start) / 1000);
 }
 
 static circlesq_t circle_from_1(const vec2_t* point) {

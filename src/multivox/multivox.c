@@ -44,7 +44,10 @@ void main_draw(pixel_t* volume) {
 int main(int argc, char** argv) {
 
     if (!voxel_buffer_map()) {
-        exit(1);
+        printf("waiting for voxel buffer\n");
+        do {
+            sleep(1);
+        } while (!voxel_buffer_map());
     }
 
     input_set_nonblocking();

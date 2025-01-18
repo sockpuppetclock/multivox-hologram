@@ -17,7 +17,7 @@
 #include "array.h"
 #include "image.h"
 
-#define CHECK_BOUNDS
+//#define CHECK_BOUNDS
 
 graphics_draw_voxel_cb_t graphics_draw_voxel_cb = NULL;
 
@@ -222,6 +222,7 @@ void graphics_draw_line(pixel_t* volume, const float* pone, const float* ptwo, p
     }
 }
 
+#ifdef TINY_TRIANGLES_CENTRED
 static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2, pixel_t colour,
                                                 const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
 
@@ -231,8 +232,7 @@ static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1
         (int)roundf((v0[2] + v1[2] + v2[2]) * (1.0f/3.0f)),
     };
 
-    if (pos[0] < 0 || pos[1] < 0 || pos[2] < 0
-     || pos[0] >= VOXELS_X || pos[1] >= VOXELS_Y || pos[2] >= VOXELS_Z) {
+    if ((uint)pos[0] >= VOXELS_X || (uint)pos[1] >= VOXELS_Y || (uint)pos[2] >= VOXELS_Z) {
         return;
     }
 
@@ -250,27 +250,68 @@ static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1
 
     volume[VOXEL_INDEX(pos[0], pos[1], pos[2])] = colour;
 }
+#else
+static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2, pixel_t colour,
+                                                const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
+
+    int pos[VEC3_SIZE] = {(int)v0[0], (int)v0[1], (int)v0[2]};
+    if ((uint)pos[0] >= VOXELS_X || (uint)pos[1] >= VOXELS_Y || (uint)pos[2] >= VOXELS_Z) {
+        return;
+    }
+
+    if (texture) {
+        bool masked;
+        colour = image_sample(texture, uv0, &masked);
+        if (masked) {
+            return;
+        }
+    }
+
+    volume[VOXEL_INDEX(pos[0], pos[1], pos[2])] = colour;
+}
+#endif
+
+
+static void swap(int* a, int* b) {
+    int t = *a;
+    *a = *b;
+    *b = t;
+}
+
+static void sort_channels(float* axis, int* xchannel, int* ychannel, int* zchannel) {
+    *xchannel = 0;
+    *ychannel = 1;
+    *zchannel = 2;
+
+    if (axis[*ychannel] > axis[*zchannel]) {
+        swap(ychannel, zchannel);
+    }
+    if (axis[*xchannel] > axis[*zchannel]) {
+        swap(xchannel, zchannel);
+    }
+
+    /* don't actually care about the order of x & y
+    if (axis[*xchannel] > axis[*ychannel]) {
+        swap(xchannel, ychannel);
+    }*/ 
+}
 
 void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2, pixel_t colour,
                                              const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
 
-    // Render a triangle as voxels. This is identical to 2D triangle rasterisation, viewed along the axis closest
-    // to the face normal.
+    // voxelise a triangle by rendering it on its most flat axis
 
-    float inf[VEC3_SIZE] = {
-        fminf(fminf(v0[0], v1[0]), v2[0]),
-        fminf(fminf(v0[1], v1[1]), v2[1]),
-        fminf(fminf(v0[2], v1[2]), v2[2])
-    };
-    if (inf[0] >= VOXELS_X || inf[1] >= VOXELS_Y || inf[2] >= VOXELS_Z) {
+    float ab_min[VEC3_SIZE];
+    vec3_min(ab_min, v0, v1);
+    vec3_min(ab_min, ab_min, v2);
+    if (ab_min[0] >= VOXELS_X || ab_min[1] >= VOXELS_Y || ab_min[2] >= VOXELS_Z) {
         return;
-    }    
-    float sup[VEC3_SIZE] = {
-        fmaxf(fmaxf(v0[0], v1[0]), v2[0]),
-        fmaxf(fmaxf(v0[1], v1[1]), v2[1]),
-        fmaxf(fmaxf(v0[2], v1[2]), v2[2])
-    };
-    if (sup[0] < 0 || sup[1] < 0 || sup[2] < 0) {
+    }
+
+    float ab_max[VEC3_SIZE];
+    vec3_max(ab_max, v0, v1);
+    vec3_max(ab_max, ab_max, v2);
+    if (ab_max[0] < 0 || ab_max[1] < 0 || ab_max[2] < 0) {
         return;
     }
 
@@ -286,24 +327,22 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
     }
 
     vec3_abs(minor, minor);
+
     int xchannel, ychannel, zchannel;
-    if (minor[0] > minor[1] && minor[0] > minor[2]) {
-        zchannel = 0; xchannel = 1; ychannel = 2;
-    } else if (minor[1] > minor[2]) {
-        zchannel = 1; xchannel = 0; ychannel = 2;
-    } else {
-        zchannel = 2; xchannel = 0; ychannel = 1;
+    sort_channels(minor, &xchannel, &ychannel, &zchannel);
+    if (ab_max[xchannel] - ab_min[xchannel] < ab_max[ychannel] - ab_min[ychannel]) {
+        swap(&xchannel, &ychannel);
     }
 
-    float voxmin[VEC3_SIZE] = {0, 0, 0};
-    float voxoff[VEC3_SIZE] = {0.5f, 0.5f, 0.5f};
-    float voxmax[VEC3_SIZE] = {VOXELS_X-1, VOXELS_Y-1, VOXELS_Z-1};
-    vec3_max(inf, inf, voxmin);
-    vec3_floor(inf, inf);
-    vec3_add(inf, inf, voxoff);
-    vec3_ceil(sup, sup);
-    vec3_min(sup, sup, voxmax);
-    vec3_add(sup, sup, voxoff);
+    float vox_min[VEC3_SIZE] = {0, 0, 0};
+    float vox_off[VEC3_SIZE] = {0.5f, 0.5f, 0.5f};
+    float vox_max[VEC3_SIZE] = {VOXELS_X-1, VOXELS_Y-1, VOXELS_Z-1};
+    vec3_max(ab_min, ab_min, vox_min);
+    vec3_floor(ab_min, ab_min);
+    vec3_add(ab_min, ab_min, vox_off);
+    vec3_ceil(ab_max, ab_max);
+    vec3_min(ab_max, ab_max, vox_max);
+    vec3_add(ab_max, ab_max, vox_off);
 
     #define ORIENT2D(a, b, c) (((b)[xchannel] - (a)[xchannel]) * ((c)[ychannel] - (a)[ychannel]) - ((b)[ychannel] - (a)[ychannel]) * ((c)[xchannel] - (a)[xchannel]))
 
@@ -311,9 +350,9 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
     float dy[VEC3_SIZE] = {v2[xchannel] - v1[xchannel], v0[xchannel] - v2[xchannel], v1[xchannel] - v0[xchannel]};
 
     float w0[VEC3_SIZE] = {
-        ORIENT2D(v1, v2, inf),
-        ORIENT2D(v2, v0, inf),
-        ORIENT2D(v0, v1, inf)
+        ORIENT2D(v1, v2, ab_min),
+        ORIENT2D(v2, v0, ab_min),
+        ORIENT2D(v0, v1, ab_min)
     };
 
     float rden = 1.0f / ORIENT2D(v0, v1, v2);
@@ -323,23 +362,22 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
 
     #undef ORIENT2D
 
-
-    int xrange = (int)(sup[xchannel] - inf[xchannel] + 1.5f);
-    int yrange = (int)(sup[ychannel] - inf[ychannel] + 1.5f);
+    int xrange = (int)(ab_max[xchannel] - ab_min[xchannel] + 1.5f);
+    int yrange = (int)(ab_max[ychannel] - ab_min[ychannel] + 1.5f);
     const uint voxels_z = (uint[3]){VOXELS_X, VOXELS_Y, VOXELS_Z}[zchannel];
 
     int voxel[VEC3_SIZE];
-    voxel[ychannel] = (int)floorf(inf[ychannel]);
+    voxel[ychannel] = (int)floorf(ab_min[ychannel]);
 
     for (int y = 0; y < yrange; ++y) {
         float w[VEC3_SIZE] = {w0[0], w0[1], w0[2]};
 
-        //bool done = false;
-        voxel[xchannel] = (int)floorf(inf[xchannel]);
+        bool done = false;
+        voxel[xchannel] = (int)floorf(ab_min[xchannel]);
         for (int x = 0; x < xrange; ++x) {
             const float e = -1e-5f;
             if (w[0] >= e && w[1] >= e && w[2] >= e) {
-                //done = true;
+                done = true;
                 
 #ifdef TRIANGLE_DITHER
                 float dither = ((float)(((x&1)<<1)|(y&1)) - 1.5f) * graphics_triangle_fuzz;
@@ -373,8 +411,8 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
                         }
                     }
                 }
-            //} else if (done) {
-            //    break;
+            } else if (done) {
+                break;
             }
 
             vec3_add(w, w, dx);
