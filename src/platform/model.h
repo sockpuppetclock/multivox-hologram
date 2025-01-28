@@ -55,5 +55,7 @@ void model_free(model_t* model);
 void model_draw(pixel_t* volume, const model_t* model, float* matrix);
 void model_get_bounds(model_t* model, vec3_t* centre, float* radius, float* height);
 
+void model_dump(model_t* model);
+
 
 #endif

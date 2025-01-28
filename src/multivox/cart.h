@@ -21,6 +21,7 @@ typedef enum {
     CART_ACTION_FAIL
 } cart_action_t;
 
+void cart_grab_shot(cart_t* cart, const pixel_t* volume);
 void cart_draw(cart_t* cart, pixel_t* volume, float slot_angle);
 
 #endif

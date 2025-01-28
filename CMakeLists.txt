@@ -3,6 +3,8 @@ project(multivox VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 
+SET(CMAKE_INSTALL_PREFIX $ENV{HOME}/Multivox)
+
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(DRIVER_SRC_DIR ${SRC_DIR}/driver)
 set(PLATFORM_SRC_DIR ${SRC_DIR}/platform)
@@ -44,6 +46,7 @@ add_executable(vortex
     ${PLATFORM_SRC_DIR}/input.c
 )
 target_link_libraries(vortex PRIVATE m rt pthread)
+install(TARGETS vortex)
 
 file(GLOB PLATFORM_SRC ${PLATFORM_SRC_DIR}/*.c)
 add_library(platform STATIC ${PLATFORM_SRC})
@@ -53,6 +56,7 @@ add_executable(multivox
     ${MULTIVOX_SRC}
 )
 target_link_libraries(multivox PRIVATE platform m)
+install(TARGETS multivox)
 
 function(add_toy toy)
     if(EXISTS ${SRC_DIR}/toys/${toy}.c)
@@ -62,10 +66,12 @@ function(add_toy toy)
         add_executable(${toy} ${TOY_SRC})
     endif()
     target_link_libraries(${toy} PRIVATE platform m)
+    install(TARGETS ${toy})
 endfunction()
 
 add_toy(viewer)
 add_toy(zander)
+add_toy(eighty)
 add_toy(tesseract)
 add_toy(flight)
 add_toy(fireworks)

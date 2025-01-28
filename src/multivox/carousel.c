@@ -22,11 +22,15 @@ static cart_t carts[] = {
         .command = "/home/pi/development/multivox/build/tesseract",
     },
     {
+        .colour = RGBPIX(0,128,128),
+        .command = "/home/pi/development/multivox/build/eighty",
+    },
+    {
         .colour = RGBPIX(0,255,0),
         .command = "/home/pi/development/multivox/build/zander",
     },
     {
-        .colour = RGBPIX(0,128,128),
+        .colour = RGBPIX(127,127,127),
         .command = "/home/pi/development/multivox/build/flight",
     },
     {
@@ -102,7 +106,7 @@ void carousel_draw(pixel_t* volume) {
     float smooth = floorf(selection_current) + ease_turn(fmodf(selection_current, 1.0f));
 
     for (int i = 0; i < cart_count; ++i) {
-        float angle =  atan((i - smooth) * 0.5f) * 2;
+        float angle =  atan((i - smooth) * 0.5f) * 1.2f;
         cart_draw(&carts[i], volume, angle);
     }
 }

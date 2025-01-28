@@ -781,3 +781,47 @@ void model_get_bounds(model_t* model, vec3_t* centre, float* radius, float* heig
     *height = zmax - zmin;
     //printf("%g,%g,%g %g, %g\n", centre->x, centre->y, centre->z, *radius, *height);
 }
+
+
+
+void model_dump(model_t* model) {
+    if (!model) {
+        return;
+    }
+
+    printf("static const model_t model = {\n");
+    printf("    .vertex_count = %d,\n", model->vertex_count);
+    printf("    .vertices = (vertex_t*)(float[][5]){");
+
+    for (int i = 0; i < model->vertex_count; ++i) {
+        if ((i % 8) == 0) {
+            printf("\n        ");
+        }
+        vertex_t* v = &model->vertices[i];
+        printf("{%g, %g, %g, %g, %g}, ", v->position.x, v->position.y, v->position.z, v->texcoord.x, v->texcoord.y);
+    }
+    printf("\n    },\n");
+
+    if (model->surface_count > 0) {
+        printf("    .surface_count = %d,\n", model->surface_count);
+        printf("    .surfaces = (surface_t[]){\n");
+
+        for (int i = 0; i < model->surface_count; ++i) {
+            surface_t* s = &model->surfaces[i];
+            printf("        {%d, (index_t[]){", s->index_count);
+
+            for (int j = 0; j < s->index_count; ++j) {
+                if ((j % 40) == 0) {
+                    printf("\n            ");
+                }
+                printf("%d, ", s->indices[j]);
+            }
+
+            printf("\n        }, RGBPIX(%d,%d,%d)},\n", R_PIX(s->colour), G_PIX(s->colour), B_PIX(s->colour));
+        }
+
+        printf("    },\n");
+    }
+    printf("};\n");
+
+}

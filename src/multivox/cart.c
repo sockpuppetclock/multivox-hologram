@@ -25,10 +25,63 @@ static model_t cart_model = {
     },
 };
 
-
-
 static float slot_height(float a) {
-    return powf(0.5f * (1 + cosf(a)), 10) * 24 - 12;
+    return powf(0.5f * (1 + cosf(a)), 80) * 24 - 12;
+}
+
+void cart_grab_shot(cart_t* cart, const pixel_t* volume) {
+    if (!cart->voxel_shot[0]) {
+        cart->voxel_shot[0] = malloc(VOXELS_COUNT * sizeof(pixel_t));
+        memset(cart->voxel_shot[0], 0, VOXELS_COUNT * sizeof(pixel_t));
+    }
+
+    for (int y = 0; y < VOXELS_Y; ++y) {
+        for (int x = 0; x < VOXELS_X; ++x) {
+            if (voxel_in_cylinder(x, y)) {
+                for (int z = 0; z < VOXELS_Z; ++z) {
+                    cart->voxel_shot[0][x * VOXELS_Z + y * VOXELS_X * VOXELS_Z + z] = volume[VOXEL_INDEX(x, y, z)];
+                }
+            }
+        }
+    }
+
+    int count[3] = {VOXELS_X, VOXELS_Y, VOXELS_Z};
+    for (int m = 1; m < count_of(cart->voxel_shot); ++m) {
+        count[0] /= 2;
+        count[1] /= 2;
+        count[2] /= 2;
+
+        if (!cart->voxel_shot[m]) {
+            cart->voxel_shot[m] = malloc(count[0] * count[1] * count[2] * sizeof(pixel_t));
+            memset(cart->voxel_shot[m], 0, count[0] * count[1] * count[2] * sizeof(pixel_t));
+        }
+
+        for (int y = 0; y < count[1]; ++y) {
+            for (int x = 0; x < count[0]; ++x) {
+                for (int z = 0; z < count[2]; ++z) {
+
+                    int rgb[3] = {0,0,0};
+                    for (int j = 0; j < 2; ++j) {
+                        for (int i = 0; i < 2; ++i) {
+                            for (int k = 0; k < 2; ++k) {
+                                pixel_t colour = cart->voxel_shot[m - 1][((x*2+i) * count[2]*2) + ((y*2+j) * count[0]*count[2]*4) + (z*2+k)];
+                                rgb[0] += R_PIX(colour);
+                                rgb[1] += G_PIX(colour);
+                                rgb[2] += B_PIX(colour);
+                            }
+                        }
+                    }
+
+                    rgb[0] = min(255, rgb[0] / 3);
+                    rgb[1] = min(255, rgb[1] / 3);
+                    rgb[2] = min(255, rgb[2] / 3);
+
+                    cart->voxel_shot[m][(x * count[2]) + (y * count[0]*count[2]) + (z)] = RGBPIX(rgb[0], rgb[1], rgb[2]);
+                }
+            }
+        }
+    }
+
 }
 
 void cart_draw(cart_t* cart, pixel_t* volume, float slot_angle) {
@@ -49,7 +102,7 @@ void cart_draw(cart_t* cart, pixel_t* volume, float slot_angle) {
             int vy = y+(VOXELS_Y/2)-(VOXELS_Y>>(m+1));
             for (int x = 0; x < VOXELS_X>>m; ++x) {
                 for (int z = 0; z < VOXELS_Z>>m; ++z) {
-                    int vz = z0 + z+(VOXELS_Z)-(VOXELS_Z>>m);
+                    int vz = z0 + z+(VOXELS_Z)-(VOXELS_Z>>m)*3/2;
                     if ((uint)vz < VOXELS_Z) {
                         volume[VOXEL_INDEX(x, vy, vz)] = cart->voxel_shot[m][(x * (VOXELS_Z>>m)) + (y * (VOXELS_X>>m) * (VOXELS_Z>>m)) + z];
                     }

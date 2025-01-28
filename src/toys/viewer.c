@@ -325,6 +325,12 @@ int main(int argc, char** argv) {
                     doffset[1] -= 0.001f;
                 }
             } break;
+
+            case 'd':
+                if (scene_model) {
+                    model_dump(scene_model);
+                }
+                break;
         }
 
         input_update();
