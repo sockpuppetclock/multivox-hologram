@@ -3,7 +3,8 @@ project(multivox VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 
-SET(CMAKE_INSTALL_PREFIX $ENV{HOME}/Multivox)
+SET(MULTIVOX_INSTALL_DIR $ENV{HOME}/Multivox)
+SET(CMAKE_INSTALL_PREFIX ${MULTIVOX_INSTALL_DIR})
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(DRIVER_SRC_DIR ${SRC_DIR}/driver)
@@ -38,6 +39,15 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMATHC_USE_UNIONS -O3 -Wall")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DMATHC_USE_UNIONS -Og -Wall")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -DMATHC_USE_UNIONS -O3 -Wall")
 
+function(add_cart cart_name cart_args)
+    install(CODE "
+        if(NOT EXISTS \"${MULTIVOX_INSTALL_DIR}/carts/${cart_name}.mct\")
+            file(WRITE \"${MULTIVOX_INSTALL_DIR}/carts/${cart_name}.mct\" \"colour=#00EFFF\n\")
+            file(APPEND \"${MULTIVOX_INSTALL_DIR}/carts/${cart_name}.mct\" \"command=${CMAKE_INSTALL_PREFIX}/bin/${cart_name}\n\")
+            file(APPEND \"${MULTIVOX_INSTALL_DIR}/carts/${cart_name}.mct\" \"arguments=${cart_args}\n\")
+        endif()
+    ")
+endfunction()
 
 file(GLOB DRIVER_SRC ${DRIVER_SRC_DIR}/*.c)
 add_executable(vortex
@@ -67,7 +77,10 @@ function(add_toy toy)
     endif()
     target_link_libraries(${toy} PRIVATE platform m)
     install(TARGETS ${toy})
+    add_cart(${toy} "")
 endfunction()
+
+add_cart(viewer ${MULTIVOX_INSTALL_DIR}/models/*.obj)
 
 add_toy(viewer)
 add_toy(zander)

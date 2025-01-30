@@ -43,11 +43,10 @@ static void load_tiles(void) {
             const char* ext = strchr(entry->d_name, '.');
             if (ext && strcmp(ext, ".obj") == 0) {
                 strncpy(filename, entry->d_name, tiles_dir + sizeof(tiles_dir) - 2 - filename);
-                array_resize(&tile_set, tile_set.count+1);
                 
                 model_t* model = model_load(tiles_dir, STYLE_WIREFRAME_ALWAYS);
                 model_set_colour(model, RGBPIX(127,255,255));
-                ((model_t**)tile_set.data)[tile_set.count-1] = model;
+                *(model_t**)array_push(&tile_set) = model;
             }
         }
     }
@@ -57,7 +56,7 @@ static void load_tiles(void) {
     size_t tile0 = tile_set.count;
     array_resize(&tile_set, tile_set.count + count_of(tile_models));
     for (int i = 0; i < count_of(tile_models); ++i) {
-        ((model_t**)tile_set.data)[tile0 + i] = (model_t*)&tile_models[i];
+        *(model_t**)array_get(&tile_set, tile0 + i) = (model_t*)&tile_models[i];
     }
 #endif
 }
@@ -104,7 +103,7 @@ static void step_tiles(void) {
             if ((rand() & 0xc0) == 0) {
                 // double
                 tile = &tile_defs[back_row][tidx];
-                tile->model = ((model_t**)tile_set.data)[rand() % tile_set.count];
+                tile->model = *(model_t**)array_get(&tile_set, rand() % tile_set.count);
                 vec3(tile->position, wall_x * side, far_row + 0.5f, wall_z);
                 vec3_assign(tile->rotation, wall_rotations[(rand() >> 11) & 3]);
                 tile->scale = tile_scale * 2.0f * -side;
@@ -113,13 +112,13 @@ static void step_tiles(void) {
             } else {
                 // singles
                 tile = &tile_defs[back_row][tidx];
-                tile->model = ((model_t**)tile_set.data)[rand() % tile_set.count];
+                tile->model = *(model_t**)array_get(&tile_set, rand() % tile_set.count);
                 vec3(tile->position, wall_x * side, far_row, wall_z + 0.5f);
                 vec3_assign(tile->rotation, wall_rotations[(rand() >> 11) & 3]);
                 tile->scale = tile_scale * -side;
 
                 tile = &tile_defs[back_row][tidx+1];
-                tile->model = ((model_t**)tile_set.data)[rand() % tile_set.count];
+                tile->model = *(model_t**)array_get(&tile_set, rand() % tile_set.count);
                 vec3(tile->position, wall_x * side, far_row, wall_z - 0.5f);
                 vec3_assign(tile->rotation, wall_rotations[(rand() >> 11) & 3]);
                 tile->scale = tile_scale * -side;
@@ -134,7 +133,7 @@ static void step_tiles(void) {
         float side = (i*2 - 1);
 
         tile = &tile_defs[back_row][tidx++];
-        tile->model = ((model_t**)tile_set.data)[rand() % tile_set.count];
+        tile->model = *(model_t**)array_get(&tile_set, rand() % tile_set.count);
         vec3(tile->position, side * 0.5f, far_row, floor_z);
         vec3_assign(tile->rotation, floor_rotations[(rand() >> 11) & 3]);
         tile->scale = tile_scale;
@@ -144,7 +143,7 @@ static void step_tiles(void) {
     for (int side = -1; side <= 1; side += 2) {
         for (int i = 0; i < 2; ++i) {
             tile = &tile_defs[back_row][tidx++];
-            tile->model = ((model_t**)tile_set.data)[rand() % tile_set.count];
+            tile->model = *(model_t**)array_get(&tile_set, rand() % tile_set.count);
             vec3(tile->position, (surface_x + i) * side, far_row, 1.0f);
             vec3_assign(tile->rotation, floor_rotations[(rand() >> 11) & 3]);
             tile->scale = tile_scale;
@@ -195,6 +194,7 @@ int main(int argc, char** argv) {
     input_set_nonblocking();
 
     for (int ch = 0; ch != 27; ch = getchar()) {
+
         pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_BACK);
         voxel_buffer_clear(volume);
 

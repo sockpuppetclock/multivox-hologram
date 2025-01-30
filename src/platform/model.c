@@ -85,7 +85,7 @@ static uint get_vertex(uint position, uint texcoord/*, uint normal*/) {
     uint32_t icurr = *ihead;
 
     while (icurr != none) {
-        vertex_tuple_t* vcurr = &((vertex_tuple_t*)scratch_vertices.data)[icurr];
+        vertex_tuple_t* vcurr = array_get(&scratch_vertices, icurr);
         
         int compare = vertex_compare((index_t*)&vcurr->position, (index_t[]){position, texcoord});
         if (compare == 0) {
@@ -102,7 +102,7 @@ static uint get_vertex(uint position, uint texcoord/*, uint normal*/) {
     uint index = scratch_vertices.count;
     array_resize(&scratch_vertices, index + 1);
 
-    vertex_tuple_t* vert = &((vertex_tuple_t*)scratch_vertices.data)[index];
+    vertex_tuple_t* vert = array_get(&scratch_vertices, index);
     vert->previous = none;
     vert->position = position;
     vert->texcoord = texcoord;
@@ -113,7 +113,7 @@ static uint get_vertex(uint position, uint texcoord/*, uint normal*/) {
     if (iprev == none) {
         *ihead = index;
     } else {
-        vertex_tuple_t* vprev = &((vertex_tuple_t*)scratch_vertices.data)[iprev];
+        vertex_tuple_t* vprev = array_get(&scratch_vertices, iprev);
         vert->previous = vprev->previous;
         vprev->previous = index;
     }
@@ -132,12 +132,12 @@ static bool edge_exists(index_t end0, index_t end1) {
     if (bitbucket >= scratch_edge_exists.count) {
         size_t end = scratch_edge_exists.count;
         array_resize(&scratch_edge_exists, ((bitbucket + 256) & ~255));
-        memset(&((uint32_t*)scratch_edge_exists.data)[end], 0, (scratch_edge_exists.count - end) * sizeof(uint32_t));
+        memset(array_get(&scratch_edge_exists, end), 0, (scratch_edge_exists.count - end) * sizeof(uint32_t));
     }
 
     uint32_t bitmask = 1U << (bitindex & 31);
 
-    uint32_t* bucket = &((uint32_t*)scratch_edge_exists.data)[bitbucket];
+    uint32_t* bucket = array_get(&scratch_edge_exists, bitbucket);
     bool exists = ((*bucket) & bitmask) != 0;
 
     *bucket |= bitmask;
@@ -177,9 +177,7 @@ static void add_unique_edge(int end0, int end1, pixel_t colour) {
     index_t two = max(end0, end1);
     
     if (!edge_exists(one, two)) {
-        array_resize(&scratch_edges, scratch_edges.count + 1);
-
-        edge_t* edge = &((edge_t*)scratch_edges.data)[scratch_edges.count-1];
+        edge_t* edge = array_push(&scratch_edges);
         edge->index[0] = one;
         edge->index[1] = two;
         edge->colour = colour;
@@ -189,7 +187,7 @@ static void add_unique_edge(int end0, int end1, pixel_t colour) {
 static void add_triangle(uint v0, uint v1, uint v2) {
     array_resize(&scratch_indices, scratch_indices.count + 3);
     
-    index_t* triangle = &((index_t*)scratch_indices.data)[scratch_indices.count - 3];
+    index_t* triangle = array_get(&scratch_indices, scratch_indices.count - 3);
     triangle[0] = v0;
     triangle[1] = v1;
     triangle[2] = v2;
@@ -236,9 +234,7 @@ static void load_mtllib(const char* path, const char* mtlfile) {
     while (fgets(line, sizeof(line), fd)) {
         if (strncasecmp(line, "newmtl ", 7) == 0) {
             trim_trailing_whitespace(line);
-            array_resize(&scratch_materials, scratch_materials.count + 1);
-
-            material_t* material = &((material_t*)scratch_materials.data)[scratch_materials.count-1];
+            material_t* material = array_push(&scratch_materials);
             memset(material, 0, sizeof(material_t));
             material->name = strdup(&line[7]);
             material->colour = RGBPIX(200, 200, 255);
@@ -246,14 +242,14 @@ static void load_mtllib(const char* path, const char* mtlfile) {
         } else if (strncasecmp(line, "map_Kd ", 7) == 0) {
             if (scratch_materials.count) {
                 trim_trailing_whitespace(line);
-                material_t* material = &((material_t*)scratch_materials.data)[scratch_materials.count-1];
+                material_t* material = array_get(&scratch_materials, scratch_materials.count-1);
                 material->image = malloc(pathlen + strlen(line) - 6);
                 memcpy(material->image, path, pathlen);
                 strcpy(&material->image[pathlen], &line[7]);
             }
         } else if (strncasecmp(line, "Kd ", 3) == 0) {
             if (scratch_materials.count) {
-                material_t* material = &((material_t*)scratch_materials.data)[scratch_materials.count-1];
+                material_t* material = array_get(&scratch_materials, scratch_materials.count-1);
                 float r = 1;
                 float g = 0;
                 float b = 1;
@@ -268,7 +264,7 @@ static void load_mtllib(const char* path, const char* mtlfile) {
 
 static material_t* get_material(const char* mtl) {
     for (int i = 0; i < scratch_materials.count; ++i) {
-        material_t* material = &((material_t*)scratch_materials.data)[i];
+        material_t* material = array_get(&scratch_materials, i);
         if (strcasecmp(material->name, mtl) == 0) {
             //printf("%d %s %s 0x%02x\n", i, material->name, material->image ? material->image : "none", material->colour);
             return material;
@@ -278,8 +274,8 @@ static material_t* get_material(const char* mtl) {
 }
 
 static void add_surface(array_t* surfaces, const char* mtl) {
-    array_resize(surfaces, surfaces->count + 1);
-    surface_t* surface = &((surface_t*)surfaces->data)[surfaces->count-1];
+
+    surface_t* surface = array_push(surfaces);
     memset(surface, 0, sizeof(surface_t));
 
     if (mtl) {
@@ -293,7 +289,7 @@ static void add_surface(array_t* surfaces, const char* mtl) {
             surface->colour = hash_colour(mtl);
         }
     } else {
-        surface->colour = 0b01010011;
+        surface->colour = RGBPIX(0x55, 0xaa, 0xff);
     }
 }
 
@@ -367,24 +363,21 @@ model_t* model_load(const char* filename, const model_style_t style) {
                 switch (line[1]) {
                     case ' ': {
                         // vertex position
-                        array_resize(&scratch_positions, scratch_positions.count + 1);
-                        vec3_t* vert = &((vec3_t*)scratch_positions.data)[scratch_positions.count - 1];
+                        vec3_t* vert = array_push(&scratch_positions);
                         sscanf(line, "v %f %f %f", &vert->x, &vert->z, &vert->y);
                         vert->y = -vert->y;
                     } break;
 
                     case 't': {
                         // vertex uv
-                        array_resize(&scratch_texcoords, scratch_texcoords.count + 1);
-                        vec2_t* vert = &((vec2_t*)scratch_texcoords.data)[scratch_texcoords.count - 1];
+                        vec2_t* vert = array_push(&scratch_texcoords);
                         sscanf(line, "vt %f %f", &vert->x, &vert->y);
                     } break;
 
 #ifdef VERTEX_NORMALS
                     case 'n': {
                         // vertex normal
-                        array_resize(&scratch_normals, scratch_normals.count + 1);
-                        vec3_t* vert = &((vec3_t*)scratch_normals.data)[scratch_normals.count - 1];
+                        vec3_t* vert = array_push(&scratch_normals);
                         sscanf(line, "vn %f %f %f", &vert->x, &vert->z, &vert->y);
                         vert->y = -vert->y;
                     } break;
@@ -452,7 +445,7 @@ model_t* model_load(const char* filename, const model_style_t style) {
 
                     if (scratch_indices.count > 0) {
                         // add all the current face data to the current surface
-                        apply_indices_to_surface(&((surface_t*)scratch_surfaces.data)[scratch_surfaces.count-1], &scratch_indices);
+                        apply_indices_to_surface(array_get(&scratch_surfaces, scratch_surfaces.count-1), &scratch_indices);
                     } else {
                         // no face data - current surface isn't used
                         pop_surface(&scratch_surfaces);
@@ -460,7 +453,7 @@ model_t* model_load(const char* filename, const model_style_t style) {
 
                     // start a new surface
                     add_surface(&scratch_surfaces, &line[7]);
-                    colour = ((surface_t*)scratch_surfaces.data)[scratch_surfaces.count-1].colour;
+                    colour = ((surface_t*)array_get(&scratch_surfaces, scratch_surfaces.count-1))->colour;
                 }
 
             } break;
@@ -472,7 +465,7 @@ model_t* model_load(const char* filename, const model_style_t style) {
     fclose(fd);
 
     if (scratch_indices.count > 0) {
-        apply_indices_to_surface(&((surface_t*)scratch_surfaces.data)[scratch_surfaces.count-1], &scratch_indices);
+        apply_indices_to_surface(array_get(&scratch_surfaces, scratch_surfaces.count-1), &scratch_indices);
     } else {
         pop_surface(&scratch_surfaces);
     }
@@ -484,12 +477,12 @@ model_t* model_load(const char* filename, const model_style_t style) {
         model->vertex_count = scratch_vertices.count;
         model->vertices = malloc(model->vertex_count * sizeof(vertex_t));
         for (int i = 0; i < model->vertex_count; ++i) {
-            vertex_tuple_t* ivert = &((vertex_tuple_t*)scratch_vertices.data)[i];
+            vertex_tuple_t* ivert = array_get(&scratch_vertices, i);
             vertex_t* mvert = &model->vertices[i];
-            vec3_assign(mvert->position.v, ((vec3_t*)scratch_positions.data)[clamp(ivert->position-1, 0, scratch_positions.capacity-1)].v);
-            vec2_assign(mvert->texcoord.v, ((vec2_t*)scratch_texcoords.data)[clamp(ivert->texcoord-1, 0, scratch_texcoords.capacity-1)].v);
+            vec3_assign(mvert->position.v, ((vec3_t*)array_get(&scratch_positions, clamp(ivert->position-1, 0, scratch_positions.capacity-1)))->v);
+            vec2_assign(mvert->texcoord.v, ((vec3_t*)array_get(&scratch_texcoords, clamp(ivert->texcoord-1, 0, scratch_texcoords.capacity-1)))->v);
 #ifdef VERTEX_NORMALS
-            vec3_assign(mvert->normal.v, ((vec3_t*)scratch_normals.data)[clamp(ivert->v[2]-1, 0, scratch_normals.capacity-1)].v);
+            vec3_assign(mvert->normal.v, ((vec3_t*)array_get(&scratch_normals, clamp(ivert->v[2]-1, 0, scratch_normals.capacity-1)))->v);
 #endif
         }
     }
@@ -507,7 +500,7 @@ model_t* model_load(const char* filename, const model_style_t style) {
     }
 
     /*for (int i = 0; i < scratch_vertices.count; ++i) {
-        vertex_tuple_t* ivert = &((vertex_tuple_t*)scratch_vertices.data)[i];
+        vertex_tuple_t* ivert = array_get(&scratch_vertices, i);
         printf("%d %d %d\n", ivert->x, ivert->y, ivert->z);
     }*/
     printf("v %ld  e %ld  s %ld   %ld ms\n", scratch_vertices.count, scratch_edges.count, scratch_surfaces.count, (clock() - time_start) / 1000);
@@ -524,7 +517,7 @@ model_t* model_load(const char* filename, const model_style_t style) {
     array_clear(&scratch_surfaces);
 
     for (int i = 0; i < scratch_materials.count; ++i) {
-        material_t* material = &((material_t*)scratch_materials.data)[i];
+        material_t* material = array_get(&scratch_materials, i);
         free(material->name);
         free(material->image);
     }

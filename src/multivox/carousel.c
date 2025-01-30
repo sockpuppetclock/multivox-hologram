@@ -3,70 +3,76 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
+#include <dirent.h>
+#include <linux/limits.h>
 
 #include "multivox.h"
 #include "input.h"
 #include "rammel.h"
 #include "timer.h"
 #include "cart.h"
+#include "array.h"
 
-static cart_t carts[] = {
-    {
-        .colour = RGBPIX(255,255,0),
-        .command = "/home/pi/development/multivox/build/viewer",
-        .arguments = "/home/pi/Multivox/models/koi/koiscene.obj /home/pi/Multivox/models/dreamchaser.obj /home/pi/Multivox/models/mantisshrimp/mantisshrimp.obj /home/pi/Multivox/models/smart/smart.obj /home/pi/Multivox/models/holochess/scene.obj /home/pi/Multivox/models/tutankhamun/tutankhamun.obj /home/pi/Multivox/models/slimer/slimer.obj /home/pi/Multivox/models/xwing/xwing.obj",
-    },
-    {
-        .colour = RGBPIX(255,0,0),
-        .command = "/home/pi/development/multivox/build/tesseract",
-    },
-    {
-        .colour = RGBPIX(0,128,128),
-        .command = "/home/pi/development/multivox/build/eighty",
-    },
-    {
-        .colour = RGBPIX(0,255,0),
-        .command = "/home/pi/development/multivox/build/zander",
-    },
-    {
-        .colour = RGBPIX(127,127,127),
-        .command = "/home/pi/development/multivox/build/flight",
-    },
-    {
-        .colour = RGBPIX(0,0,255),
-        .command = "/home/pi/development/doom/doomvox/doomvox/doomvox",
-        .workingdir = "/home/pi/development/doom/doomvox",
-        .arguments = "-iwad DOOM.WAD"
-    },
-    {
-        .colour = RGBPIX(255,128,0),
-        .command = "/home/pi/development/gta/GTA3/re3-rel-oal",
-        .workingdir = "/home/pi/development/gta/GTA3",
-        .environment = "DISPLAY=:0.0 XAUTHORITY=/home/pi/.Xauthority"
-    },
 
-};
+static array_t carts = {sizeof(cart_t)};
 
-static uint cart_count = count_of(carts);
 
 static int selection_target;
 static float selection_current;
 
 
+static void load_carts(const char* directory) {
+    DIR* dir;
+    struct dirent* entry;
+
+    if ((dir = opendir(directory)) == NULL) {
+        perror("opendir");
+        return;
+    }
+
+    while ((entry = readdir(dir))) {
+        size_t namelen = strlen(entry->d_name);
+        if (namelen > 4 && strcmp(entry->d_name + namelen - 4, ".mct") == 0) {
+            char filepath[PATH_MAX];
+            if (snprintf(filepath, sizeof(filepath), "%s/%s", directory, entry->d_name) >= 0) {
+                if (!cart_load(array_push(&carts), filepath)) {
+                    array_pop(&carts);
+                }
+            }
+        }
+    }
+
+    closedir(dir);
+}
+
 void carousel_init() {
     selection_target = 0;
     selection_current = 0;
+
+    char directory_string[PATH_MAX];
+    const char* directory = getenv("MULTIVOX_CART_PATH");
+    if (!directory) {
+        const char* home = getenv("HOME");
+        if (!home) {
+            home = "/home/pi";
+        }
+        snprintf(directory_string, sizeof(directory_string), "%s/Multivox/carts", home);
+        directory = directory_string;
+    }
+
+    load_carts(directory);
 }
 
 void carousel_update(float dt) {
     const float speed = 3.0f;
 
     if (input_get_button(0, BUTTON_RB, BUTTON_PRESSED)) {
-        selection_target = min(selection_target + 1, (float)cart_count - 1);
+        selection_target = min(selection_target + 1, carts.count - 1);
     }
     if (input_get_button(0, BUTTON_LB, BUTTON_PRESSED)) {
-        selection_target = max(selection_target - 1, 0.0f);
+        selection_target = max(selection_target - 1, 0);
     }
 
     float target = (float)selection_target;
@@ -82,7 +88,7 @@ void carousel_update(float dt) {
         return;
     }
     if (input_get_button(0, BUTTON_A, BUTTON_PRESSED)) {
-        cart_action_t action = multivox_cart_execute(&carts[selection_target]);
+        cart_action_t action = multivox_cart_execute(array_get(&carts, selection_target));
         (void)action;
         return;
     }
@@ -105,9 +111,9 @@ static float ease_turn(float a) {
 void carousel_draw(pixel_t* volume) {
     float smooth = floorf(selection_current) + ease_turn(fmodf(selection_current, 1.0f));
 
-    for (int i = 0; i < cart_count; ++i) {
+    for (int i = 0; i < carts.count; ++i) {
         float angle =  atan((i - smooth) * 0.5f) * 1.2f;
-        cart_draw(&carts[i], volume, angle);
+        cart_draw(array_get(&carts, i), volume, angle);
     }
 }
 

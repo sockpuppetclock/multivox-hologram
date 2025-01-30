@@ -206,34 +206,6 @@ void* temperature_worker(void *vargp) {
     return NULL;
 }
 
-static const uint8_t combo_quit[] = {BUTTON_MENU, BUTTON_MENU, BUTTON_MENU, BUTTON_MENU, BUTTON_MENU};
-static const uint8_t combo_konami[] = {BUTTON_UP, BUTTON_UP, BUTTON_DOWN, BUTTON_DOWN, BUTTON_LEFT, BUTTON_RIGHT, BUTTON_LEFT, BUTTON_RIGHT, BUTTON_B, BUTTON_A};
-
-#define DOOMPATH   "/home/pi/development/doom/doomvox/"
-#define DOOMVOXAPP DOOMPATH "doomvox/doomvox"
-#define DOOMVOXWAD DOOMPATH "DOOM1.WAD"
-
-static void check_combo(void) {
-
-    if (input_get_combo(combo_quit, sizeof(combo_quit))) {
-        printf("SHUTDOWN!\n");
-        system("sudo shutdown -P now");
-    }
-
-    if (input_get_combo(combo_konami, sizeof(combo_konami))) {
-        printf("KONAMI!\n");
-        pid_t pid = fork();
-        if (pid == 0) {
-            chdir(DOOMPATH);
-            static char *argv[]={DOOMVOXAPP, "-iwad", DOOMVOXWAD, NULL};
-            execv(DOOMVOXAPP, argv);
-            exit(127);
-        } else {
-            waitpid(pid, 0, 0);
-        }
-    }
-}
-
 int main(int argc, char** argv) {
     if (argc < 2) {
         printf("no scene specified\n");
@@ -334,7 +306,6 @@ int main(int argc, char** argv) {
         }
 
         input_update();
-        check_combo();
 
         if (input_get_button(0, BUTTON_A, BUTTON_PRESSED)) {
             navigation_style = (navigation_style + 1) % NAVIGATION_COUNT;

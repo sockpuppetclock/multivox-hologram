@@ -9,9 +9,10 @@ typedef struct {
     const char* workingdir;
     const char* environment;
 
-    pixel_t * voxel_shot[4];
-
     pixel_t colour;
+
+    const char* cartpath;
+    pixel_t * voxel_shot[4];
 } cart_t;
 
 typedef enum {
@@ -21,7 +22,9 @@ typedef enum {
     CART_ACTION_FAIL
 } cart_action_t;
 
-void cart_grab_shot(cart_t* cart, const pixel_t* volume);
+void cart_grab_voxshot(cart_t* cart, const pixel_t* volume);
+void cart_save_voxshot(cart_t* cart);
+bool cart_load(cart_t* cart, char* filename);
 void cart_draw(cart_t* cart, pixel_t* volume, float slot_angle);
 
 #endif

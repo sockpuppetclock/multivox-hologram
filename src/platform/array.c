@@ -31,7 +31,8 @@ void array_reserve(array_t* array, size_t capacity) {
 void array_resize(array_t* array, size_t count) {
     if (!array->data) {
         if (!array->capacity) {
-            array->capacity = count > 64 ? count : 64;
+            size_t mincap = 1024 / array->size;
+            array->capacity = count > mincap ? count : mincap;
         }
         array->count = count;
         array->data = malloc(array->capacity * array->size);
@@ -56,6 +57,19 @@ void array_destroy(array_t* array) {
     array->data = NULL;
     array->capacity = 0;
     array->count = 0;
+}
+
+void* array_push(array_t* array) {
+    array_resize(array, array->count + 1);
+    return array_get(array, array->count - 1);
+}
+
+void* array_pop(array_t* array) {
+    if (array->count < 1) {
+        return NULL;
+    }
+    array_resize(array, array->count - 1);
+    return array_get(array, array->count);
 }
 
 void array_clear_element(array_t* array, size_t index) {

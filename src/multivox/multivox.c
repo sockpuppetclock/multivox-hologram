@@ -27,6 +27,10 @@
 #include "carousel.h"
 
 
+static const uint8_t combo_shutdown[] = {BUTTON_MENU, BUTTON_MENU, BUTTON_MENU, BUTTON_MENU, BUTTON_MENU};
+static const uint8_t combo_reboot[] = {BUTTON_MENU, BUTTON_MENU, BUTTON_MENU, BUTTON_MENU, BUTTON_X};
+//static const uint8_t combo_konami[] = {BUTTON_UP, BUTTON_UP, BUTTON_DOWN, BUTTON_DOWN, BUTTON_LEFT, BUTTON_RIGHT, BUTTON_LEFT, BUTTON_RIGHT, BUTTON_B, BUTTON_A};
+
 void main_init(void) {
     timer_init();
     carousel_init();
@@ -35,6 +39,13 @@ void main_init(void) {
 void main_update(float dt) {    
     input_update();
     carousel_update(dt);
+
+    if (input_get_combo(combo_shutdown, sizeof(combo_shutdown))) {
+        system("sudo shutdown -P now");
+    }
+    if (input_get_combo(combo_reboot, sizeof(combo_reboot))) {
+        system("sudo reboot");
+    }
 }
 
 void main_draw(pixel_t* volume) {
@@ -106,7 +117,8 @@ static cart_action_t background_loop(pid_t pid) {
             if (!background_process()) {
                 //printf("suspend\n");
                 if (kill(cart_context.process_id, SIGSTOP) == 0) {
-                    cart_grab_shot(cart_context.cart, voxel_buffer_get(VOXEL_BUFFER_FRONT));
+                    cart_grab_voxshot(cart_context.cart, voxel_buffer_get(VOXEL_BUFFER_FRONT));
+                    cart_save_voxshot(cart_context.cart);
                     return CART_ACTION_PAUSE;
 
                 } else {
@@ -127,7 +139,7 @@ static cart_action_t background_loop(pid_t pid) {
 
             }
 
-            cart_grab_shot(cart_context.cart, voxel_buffer_get(VOXEL_BUFFER_FRONT));
+            cart_grab_voxshot(cart_context.cart, voxel_buffer_get(VOXEL_BUFFER_FRONT));
             return CART_ACTION_EJECT;
         }
     }

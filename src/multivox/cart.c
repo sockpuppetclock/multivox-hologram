@@ -2,6 +2,11 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "mathc.h"
 #include "model.h"
@@ -25,11 +30,37 @@ static model_t cart_model = {
     },
 };
 
+
+static char* key_value(char* line, const char* key) {
+
+    const char whitespace[] = " \f\n\r\t\v";
+    char* token = line + strspn(line, whitespace);
+
+    size_t keylen = strlen(key);
+    if (strncmp(token, key, keylen) == 0) {
+        token = strchr(token, '=');
+        if (token && *++token) {
+            token += strspn(token, whitespace);
+            
+            size_t len = strlen(token);
+            while (len > 0 && strchr(whitespace, token[len-1])) {
+                --len;
+            }
+            char* value = malloc(len + 1);
+            memcpy(value, token, len);
+            value[len] = '\0';
+            return value;
+        }
+    }
+
+    return NULL;
+}
+
 static float slot_height(float a) {
     return powf(0.5f * (1 + cosf(a)), 80) * 24 - 12;
 }
 
-void cart_grab_shot(cart_t* cart, const pixel_t* volume) {
+void cart_grab_voxshot(cart_t* cart, const pixel_t* volume) {
     if (!cart->voxel_shot[0]) {
         cart->voxel_shot[0] = malloc(VOXELS_COUNT * sizeof(pixel_t));
         memset(cart->voxel_shot[0], 0, VOXELS_COUNT * sizeof(pixel_t));
@@ -82,6 +113,108 @@ void cart_grab_shot(cart_t* cart, const pixel_t* volume) {
         }
     }
 
+}
+
+static void try_load_voxshot(cart_t* cart, char* filename) {
+    int fd = open(filename, O_RDONLY);
+    if (fd == -1) {
+        return;
+    }
+
+    struct stat sb;
+    if (fstat(fd, &sb) == -1) {
+        perror("fstat");
+        close(fd);
+        return;
+    }
+
+    size_t size = sb.st_size;
+    if (size != VOXELS_COUNT) {
+        close(fd);
+        return;
+    }
+
+    void* mapped = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (mapped == MAP_FAILED) {
+        perror("mmap");
+        close(fd);
+        return;
+    }
+
+    cart_grab_voxshot(cart, mapped);
+
+    munmap(mapped, size);
+    close(fd);
+}
+
+void cart_save_voxshot(cart_t* cart) {
+    if (!cart->cartpath || !cart->voxel_shot[0]) {
+        return;
+    }
+
+    size_t namelen = strlen(cart->cartpath);
+    if (namelen > 4 && cart->cartpath[namelen-4] == '.') {
+        char shotname[namelen+1];
+        memcpy(shotname, cart->cartpath, namelen - 4);
+        memcpy(shotname + namelen - 4, ".rvx", 5);
+
+        FILE* fd = fopen(shotname, "wb");
+        if (!fd) {
+            perror("save");
+        }
+
+        fwrite(cart->voxel_shot[0], sizeof(pixel_t), VOXELS_COUNT, fd);
+        fclose(fd);
+    }
+}
+
+bool cart_load(cart_t* cart, char* filename) {
+    memset(cart, 0, sizeof(*cart));
+
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        perror("fopen");
+        return false;
+    }
+
+    size_t namelen = strlen(filename);
+
+    char* cartpath = malloc(namelen + 1);
+    memcpy(cartpath, filename, namelen);
+    cartpath[namelen] = '\0';
+    cart->cartpath = cartpath;
+    
+    cart->colour = RGBPIX(0xff,0x00,0xff);
+
+    char line[1024];
+    while (fgets(line, sizeof(line), file)) {
+        if (!cart->command) cart->command = key_value(line, "command");
+        if (!cart->arguments) cart->arguments = key_value(line, "arguments");
+        if (!cart->workingdir) cart->workingdir = key_value(line, "workingdir");
+        if (!cart->environment) cart->environment = key_value(line, "environment");
+        
+        char* value;
+        if ((value = key_value(line, "colour"))) {
+            int r, g, b;
+            if (sscanf(value, "#%02x%02x%02x", &r, &g, &b) == 3) {
+                cart->colour = RGBPIX(r, g, b);
+            }
+            free(value);
+        }
+    }
+
+    fclose(file);
+
+    if (namelen > 4 && filename[namelen-4] == '.') {
+        char shotname[namelen+1];
+        memcpy(shotname, filename, namelen - 4);
+        memcpy(shotname + namelen - 4, ".rvx", 5);
+        
+        try_load_voxshot(cart, shotname);
+    }
+
+    
+    return true;
 }
 
 void cart_draw(cart_t* cart, pixel_t* volume, float slot_angle) {
