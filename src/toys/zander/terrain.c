@@ -148,23 +148,25 @@ void draw_ground(pixel_t* volume) {
             }
 
 #ifdef STEEP_SLOPES
-            int zinf = z;
-            int zsup = z;
+            if (z >= 0) {
+                int zinf = z;
+                int zsup = z;
 
-            if (y > 0) {
-                zinf = min(zinf, height_map[y-1][x][0]);
-                zsup = max(zsup, height_map[y-1][x][0]);
-            }
-            if (x > 0) {
-                zinf = min(zinf, height_map[y][x-1][0]);
-                zsup = max(zsup, height_map[y][x-1][0]);
-            }
-            
-            zinf = max(0, zinf + 1);
-            zsup = min(VOXELS_Z-1, zsup - 1);
+                if (y > 0) {
+                    zinf = min(zinf, height_map[y-1][x][0]);
+                    zsup = max(zsup, height_map[y-1][x][0]);
+                }
+                if (x > 0) {
+                    zinf = min(zinf, height_map[y][x-1][0]);
+                    zsup = max(zsup, height_map[y][x-1][0]);
+                }
+                
+                zinf = max(0, zinf + 1);
+                zsup = min(VOXELS_Z-1, zsup - 1);
 
-            for (z = zinf; z <= zsup; ++z) {
-                volume[VOXEL_INDEX(x, y, z)] = current_tile_colour;
+                for (z = zinf; z <= zsup; ++z) {
+                    volume[VOXEL_INDEX(x, y, z)] = current_tile_colour;
+                }
             }
 #endif
 
