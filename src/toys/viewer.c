@@ -244,9 +244,9 @@ int main(int argc, char** argv) {
     input_set_nonblocking();
 
     int scene_target = scene_current;
-    bool scene_reload = false;
 
     for (int ch = 0; ch != 27; ch = getchar()) {
+        bool scene_reload = false;
 
         switch (ch) {
             case '[': {
