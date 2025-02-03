@@ -34,6 +34,7 @@ typedef enum {
 extern voxel_2D_t slice_map[SLICE_COUNT][PANEL_WIDTH][PANEL_COUNT];
 extern float eccentricity[2];
 
+void slicemap_ebr(int* a, int n);
 void slicemap_init(slice_brightness_t brightness);
 
 

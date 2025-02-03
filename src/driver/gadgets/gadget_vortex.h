@@ -44,6 +44,9 @@ static const int matrix_init_out[] = {RGB_0_B1, RGB_0_G1, RGB_0_R1, RGB_0_B2, RG
 #define PANEL_0_ORDER(c) (c)
 #define PANEL_1_ORDER(c) (c)
 
+#define PANEL_0_ECCENTRICITY 13.5
+#define PANEL_1_ECCENTRICITY 0.375
+
 #define VOXELS_X 128
 #define VOXELS_Y 128
 #define VOXELS_Z 64

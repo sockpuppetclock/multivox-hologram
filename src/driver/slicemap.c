@@ -20,10 +20,23 @@ _Static_assert(((SLICE_COUNT)&3)==0, "slice count must be a multiple of 4");
 _Static_assert((1<<(sizeof(((slice_polar_t*)0)->slice )*8)) >= SLICE_COUNT, "slice precision overflow");
 _Static_assert((1<<(sizeof(((slice_polar_t*)0)->column)*8)) >= PANEL_WIDTH, "matrix width overflow");
 
-float eccentricity[2] = {13.5f, 0.375f}; // each panel's offset from the axis, in units of led pitch
+#ifndef PANEL_0_ECCENTRICITY
+#define ECCENTRICITY_0 0
+#else
+#define ECCENTRICITY_0 PANEL_0_ECCENTRICITY
+#endif
+
+#ifndef PANEL_1_ECCENTRICITY
+#define ECCENTRICITY_1 0
+#else
+#define ECCENTRICITY_1 PANEL_1_ECCENTRICITY
+#endif
+
+float eccentricity[2] = {ECCENTRICITY_0, ECCENTRICITY_1}; // each panel's offset from the axis, in units of led pitch
 
 
-static void extended_bit_reversal(int* a, int n) {
+// extended bit reversal
+void slicemap_ebr(int* a, int n) {
     if (n == 1) {
         a[0] = 0;
         return;
@@ -33,7 +46,7 @@ static void extended_bit_reversal(int* a, int n) {
 
     #define S(i_) ((i_) < k ? (i_) : ((i_) + 1))
 
-    extended_bit_reversal(a, k);
+    slicemap_ebr(a, k);
     if (!(n & 1)) {
         for (int i = k - 1; i >= 1; i -= 1) {
             a[2 * i] = a[i];
@@ -58,7 +71,7 @@ void slicemap_init(slice_brightness_t brightness) {
     // relaxing this rule allows a brighter image at the cost of uniformity across the volume
 
     int slice[SLICE_QUADRANT];
-    extended_bit_reversal(slice, count_of(slice));
+    slicemap_ebr(slice, count_of(slice));
 
     memset(slice_map, 0xff, sizeof(slice_map));
 

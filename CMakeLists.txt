@@ -89,3 +89,35 @@ add_toy(tesseract)
 add_toy(flight)
 add_toy(fireworks)
 
+
+
+
+set(SIMULATOR_SRC_DIR ${SRC_DIR}/simulator)
+file(GLOB VIRTEX_SRC ${SIMULATOR_SRC_DIR}/*.c)
+
+set(GLSL_DIRECTORY "${SIMULATOR_SRC_DIR}")
+file(GLOB GLSL_FILES "${GLSL_DIRECTORY}/*.glsl")
+
+set(GLSL_HEADERS)
+foreach(GLSL_FILE ${GLSL_FILES})
+    get_filename_component(BASENAME "${GLSL_FILE}" NAME_WE)
+    set(GLSL_HEADER "${BUILD_DIR}/generated/${BASENAME}_glsl.h")
+
+    add_custom_command(
+        OUTPUT "${GLSL_HEADER}"
+        COMMAND ${CMAKE_COMMAND} -DINPUT_FILE="${GLSL_FILE}" -DOUTPUT_FILE="${GLSL_HEADER}" -P ${CMAKE_SOURCE_DIR}/glsl.cmake
+        DEPENDS "${GLSL_FILE}"
+        COMMENT "Wrapping ${GLSL_FILE} to ${GLSL_HEADER}"
+    )
+    
+    list(APPEND GLSL_HEADERS ${GLSL_HEADER})
+endforeach()
+
+add_library(glsl_headers INTERFACE)
+target_sources(glsl_headers INTERFACE ${GLSL_HEADERS})
+
+add_executable(virtex
+    ${VIRTEX_SRC}
+    ${DRIVER_SRC_DIR}/slicemap.c
+)
+target_link_libraries(virtex PRIVATE platform glsl_headers X11 EGL GLESv2 m)
