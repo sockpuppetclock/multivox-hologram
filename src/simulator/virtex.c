@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!sim_init()) {
+    if (!sim_init(argc, argv)) {
         return 1;
     }
 

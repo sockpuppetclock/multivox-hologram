@@ -3,8 +3,10 @@
 #include <stddef.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -20,27 +22,133 @@
 #include "volume_vert_glsl.h"
 #include "volume_frag_glsl.h"
 
+_Static_assert(sizeof(pixel_t)==1, "simulator only supports RGB332");
+_Static_assert(VOXEL_Z_STRIDE==1, "simulator assumes z stride is 1");
+
+typedef enum {
+    SCAN_RADIAL,
+    SCAN_LINEAR
+} scan_geometry_t;
+
+typedef struct {
+    int screen_width;
+    int screen_height;
+    float screen_offset[2];
+    size_t screen_count;
+    size_t slice_count;
+    scan_geometry_t scan_geometry;
+} sim_geometry_t;
+
+static sim_geometry_t sim_geometry = {
 
 #ifdef PANEL_0_ECCENTRICITY
     #ifdef PANEL_1_ECCENTRICITY
-        const float board_offset[] = {(float)(PANEL_0_ECCENTRICITY)/(float)(PANEL_WIDTH/2), (float)(PANEL_1_ECCENTRICITY)/(float)(PANEL_WIDTH/2)};
-        const size_t board_count = (PANEL_0_ECCENTRICITY) == (PANEL_1_ECCENTRICITY) ? 1 : 2;
+        .screen_offset = {(float)(PANEL_0_ECCENTRICITY)/(float)(PANEL_WIDTH/2), (float)(PANEL_1_ECCENTRICITY)/(float)(PANEL_WIDTH/2)},
+        .screen_count = ((PANEL_0_ECCENTRICITY) == (PANEL_1_ECCENTRICITY) ? 1 : 2),
     #else
-        const float board_offset[] = {(float)(PANEL_0_ECCENTRICITY)/(float)(PANEL_WIDTH/2)};
-        const size_t board_count = 1;
+        .screen_offset = {(float)(PANEL_0_ECCENTRICITY)/(float)(PANEL_WIDTH/2)},
+        .screen_count = 1,
     #endif
 #else
-        const float board_offset[] = {0};
-        const size_t board_count = 1;
+        .screen_offset = {0},
+        .screen_count = 1,
 #endif
 
 #ifdef VERTICAL_SCAN
-    const int board_width = PANEL_HEIGHT * 2;
-    const int board_height = PANEL_WIDTH;
+    .screen_width = PANEL_HEIGHT * 2,
+    .screen_height = PANEL_WIDTH,
 #else
-    const int board_width = PANEL_WIDTH;
-    const int board_height = PANEL_HEIGHT;    
+    .screen_width = PANEL_WIDTH,
+    .screen_height = PANEL_HEIGHT,
 #endif
+
+    .slice_count = 360,
+    .scan_geometry = SCAN_RADIAL
+};
+
+int sim_bpc = 2;
+
+static void parse_args(int argc, char** argv) {
+    bool help = false;
+    for (int opt = 0; opt != -1; opt = getopt(argc, argv, "o:s:w:g:b:")) {
+        switch(opt) {
+            case 'o': {
+                sim_geometry.screen_offset[0] = sim_geometry.screen_offset[1] = atof(optarg);
+                if (optind < argc) {
+                    sim_geometry.screen_offset[1] = atof(argv[optind++]);
+                }
+                sim_geometry.screen_count = 1 + (sim_geometry.screen_offset[0] != sim_geometry.screen_offset[1]);
+            } break;
+
+            case 's': {
+                sim_geometry.slice_count = clampi(atoi(optarg), 1, 4096);
+            } break;
+
+            case 'w': {
+                if (optind < argc) {
+                    int w = atoi(optarg);
+                    int h = atoi(argv[optind++]);
+                    if (w > 0 && h > 0) {
+                        sim_geometry.screen_width = w;
+                        sim_geometry.screen_height = h;
+                    }
+                }
+            } break;
+
+            case 'g': {
+                switch (*optarg) {
+                    case 'l': sim_geometry.scan_geometry = SCAN_LINEAR; break;
+                    case 'r': sim_geometry.scan_geometry = SCAN_RADIAL; break;
+                }
+            } break;
+
+            case 'b': {
+                sim_bpc = clampi(atoi(optarg), 1, 3);
+            } break;
+
+            case '?': {
+                help = true;
+            } break;
+        }
+    }
+
+    if (help) {
+        printf("%s - multivox volumetric display simulator.\n"
+               " -b X     bit depth\n"
+               " -s X     slice count\n"
+               " -w X X   panel resolution (width, height)\n"
+               " -o X X   panel offset (front, back)\n"
+               " -g X     geometry (radial, linear)\n\n",
+    argv[0]);
+    // -o offset front back
+    // -s slices
+    // -w dimensions w h
+
+    }
+
+    if (sim_geometry.screen_count > 1
+     && sim_geometry.scan_geometry == SCAN_RADIAL
+     && sim_geometry.screen_offset[0] != sim_geometry.screen_offset[1]
+     && sim_geometry.screen_offset[0] >= 0
+     && sim_geometry.screen_offset[1] >= 0) {
+        sim_geometry.screen_count = 2;
+    } else {
+        sim_geometry.screen_count = 1;
+    }
+
+    printf("      slice count: %ld\n panel resolution: %dx%d\n", sim_geometry.slice_count, sim_geometry.screen_width, sim_geometry.screen_height);
+    if (sim_geometry.screen_count > 1) {
+        printf("   screen offsets: %g %g\n", sim_geometry.screen_offset[0], sim_geometry.screen_offset[1]);
+    } else {
+        printf("    screen offset: %g\n", sim_geometry.screen_offset[0]);
+    }
+    switch (sim_geometry.scan_geometry) {
+        case SCAN_RADIAL: printf("         geometry: radial\n"); break;
+        case SCAN_LINEAR: printf("         geometry: linear\n"); break;
+    }
+    printf("     colour depth: %d bpc\n", sim_bpc);
+}
+
 
 
 typedef struct {
@@ -52,6 +160,7 @@ typedef struct {
     GLuint program;
     GLuint u_view;
     GLuint u_proj;
+    GLuint u_bpcmask;
 } draw_state_t;
 
 typedef struct {
@@ -174,33 +283,35 @@ static void init_texture(void) {
     glBindTexture(GL_TEXTURE_3D, volume.texture);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    //glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    //glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    //glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R8UI, VOXELS_Z, VOXELS_X, VOXELS_Y, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, voxel_buffer->volume[voxel_buffer->page]);
 }
 
-static void init_mesh(void) {
+static size_t create_mesh_radial() {
     // create a mesh containing quads for every slice the screens rotate through
 
-    size_t slice_count = 240;
-    volume_vertex_t vertices[slice_count][board_count][12];
+    volume_vertex_t vertices[sim_geometry.slice_count][sim_geometry.screen_count][12];
 
-    int scatter[slice_count];
+    int scatter[sim_geometry.slice_count];
     slicemap_ebr(scatter, count_of(scatter));
 
     const float z = (float)VOXELS_Z / (float)VOXELS_X;
-    const float board_radius = (float)board_width * 0.5f;
+    const float radius = (float)sim_geometry.screen_width * 0.5f;
 
-    for (int s = 0; s < slice_count; ++s) {
-        float angle = (float)s * M_PI * 2.0f / (float)slice_count;
+    for (int s = 0; s < sim_geometry.slice_count; ++s) {
+        float angle = (float)s * M_PI * 2.0f / (float)sim_geometry.slice_count;
         vec2_t slope = {.x = cosf(angle), .y = sinf(angle)};
         
         // throttle the inner columns
-        float hole = (float)scatter[s] / (float)slice_count;
-        hole = floorf(hole * board_radius) / board_radius;
+        float hole = (float)scatter[s] / (float)sim_geometry.slice_count;
+        hole = floorf(hole * radius) / radius;
 
-        for (int p = 0; p < board_count; ++p) {
+        for (int p = 0; p < sim_geometry.screen_count; ++p) {
             float side = (p ? -1 : 1);
-            vec2_t offset = {.x = slope.y * board_offset[p] * side, .y = -slope.x * board_offset[p] * side};
+            vec2_t offset = {.x = slope.y * sim_geometry.screen_offset[p] * side, .y = -slope.x * sim_geometry.screen_offset[p] * side};
 
             vec2_t inner, outer;
             vec2_multiply_f(outer.v, slope.v, side);
@@ -217,38 +328,68 @@ static void init_mesh(void) {
             for (int i = 0; i < 2; ++i) {
                 float box = max(fabsf(ends[3*i].x), fabsf(ends[3*i].y));
                 if (box > 1.0f) {
-                    rim[i] = floorf((1.0f / box) * board_radius) / board_radius;
+                    rim[i] = floorf((1.0f / box) * radius) / radius;
                     hole = min(hole, rim[i]);
                     vec2_multiply_f(ends[3*i].v, ends[3*i].v, rim[i]);
                 }
             }
 
-            vertices[s][p][0] = (volume_vertex_t){.position={ends[0].x, ends[0].y, -z}, .texcoord={0, (1+ends[0].x)*0.5f, (1+ends[0].y)*0.5f}, .dotcoord={board_radius * hole, 0.0f}};
-            vertices[s][p][1] = (volume_vertex_t){.position={ends[1].x, ends[1].y, -z}, .texcoord={0, (1+ends[1].x)*0.5f, (1+ends[1].y)*0.5f}, .dotcoord={board_radius*rim[0], 0.0f}};
-            vertices[s][p][2] = (volume_vertex_t){.position={ends[0].x, ends[0].y,  z}, .texcoord={1, (1+ends[0].x)*0.5f, (1+ends[0].y)*0.5f}, .dotcoord={board_radius * hole, (float)board_height}};
-            vertices[s][p][3] = (volume_vertex_t){.position={ends[1].x, ends[1].y,  z}, .texcoord={1, (1+ends[1].x)*0.5f, (1+ends[1].y)*0.5f}, .dotcoord={board_radius*rim[0], (float)board_height}};
+            vertices[s][p][0] = (volume_vertex_t){.position={ends[0].x, ends[0].y, -z}, .texcoord={0, (1+ends[0].x)*0.5f, (1+ends[0].y)*0.5f}, .dotcoord={radius * hole, 0.0f}};
+            vertices[s][p][1] = (volume_vertex_t){.position={ends[1].x, ends[1].y, -z}, .texcoord={0, (1+ends[1].x)*0.5f, (1+ends[1].y)*0.5f}, .dotcoord={radius*rim[0], 0.0f}};
+            vertices[s][p][2] = (volume_vertex_t){.position={ends[0].x, ends[0].y,  z}, .texcoord={1, (1+ends[0].x)*0.5f, (1+ends[0].y)*0.5f}, .dotcoord={radius * hole, (float)sim_geometry.screen_height}};
+            vertices[s][p][3] = (volume_vertex_t){.position={ends[1].x, ends[1].y,  z}, .texcoord={1, (1+ends[1].x)*0.5f, (1+ends[1].y)*0.5f}, .dotcoord={radius*rim[0], (float)sim_geometry.screen_height}};
             vertices[s][p][4] = vertices[s][p][2];
             vertices[s][p][5] = vertices[s][p][1];
 
-            vertices[s][p][6] = (volume_vertex_t){.position={ends[2].x, ends[2].y, -z}, .texcoord={0, (1+ends[2].x)*0.5f, (1+ends[2].y)*0.5f}, .dotcoord={board_radius * hole, 0.0f}};
-            vertices[s][p][7] = (volume_vertex_t){.position={ends[3].x, ends[3].y, -z}, .texcoord={0, (1+ends[3].x)*0.5f, (1+ends[3].y)*0.5f}, .dotcoord={board_radius*rim[1], 0.0f}};
-            vertices[s][p][8] = (volume_vertex_t){.position={ends[2].x, ends[2].y,  z}, .texcoord={1, (1+ends[2].x)*0.5f, (1+ends[2].y)*0.5f}, .dotcoord={board_radius * hole, (float)board_height}};
-            vertices[s][p][9] = (volume_vertex_t){.position={ends[3].x, ends[3].y,  z}, .texcoord={1, (1+ends[3].x)*0.5f, (1+ends[3].y)*0.5f}, .dotcoord={board_radius*rim[1], (float)board_height}};
+            vertices[s][p][6] = (volume_vertex_t){.position={ends[2].x, ends[2].y, -z}, .texcoord={0, (1+ends[2].x)*0.5f, (1+ends[2].y)*0.5f}, .dotcoord={radius * hole, 0.0f}};
+            vertices[s][p][7] = (volume_vertex_t){.position={ends[3].x, ends[3].y, -z}, .texcoord={0, (1+ends[3].x)*0.5f, (1+ends[3].y)*0.5f}, .dotcoord={radius*rim[1], 0.0f}};
+            vertices[s][p][8] = (volume_vertex_t){.position={ends[2].x, ends[2].y,  z}, .texcoord={1, (1+ends[2].x)*0.5f, (1+ends[2].y)*0.5f}, .dotcoord={radius * hole, (float)sim_geometry.screen_height}};
+            vertices[s][p][9] = (volume_vertex_t){.position={ends[3].x, ends[3].y,  z}, .texcoord={1, (1+ends[3].x)*0.5f, (1+ends[3].y)*0.5f}, .dotcoord={radius*rim[1], (float)sim_geometry.screen_height}};
             vertices[s][p][10] = vertices[s][p][8];
             vertices[s][p][11] = vertices[s][p][7];
 
         }
     }
 
-    volume.vertex_count = sizeof(vertices) / sizeof(volume_vertex_t);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+    return sizeof(vertices) / sizeof(volume_vertex_t);
+}
+
+static size_t create_mesh_linear() {
+    volume_vertex_t vertices[sim_geometry.slice_count][6];
+
+    const float zaspect = ((float)VOXELS_Z / (float)VOXELS_X);
+
+    for (int s = 0; s < sim_geometry.slice_count; ++s) {
+        float z = ((((float)s + 0.5f) / (float)(sim_geometry.slice_count)) * 2.0f - 1.0f);
+
+        vertices[s][0] = (volume_vertex_t){.position={ -1, -1, z * zaspect}, .texcoord={(1+z)*0.5, 0, 0}, .dotcoord={0, 0}};
+        vertices[s][1] = (volume_vertex_t){.position={  1, -1, z * zaspect}, .texcoord={(1+z)*0.5, 1, 0}, .dotcoord={sim_geometry.screen_width,0}};
+        vertices[s][2] = (volume_vertex_t){.position={ -1,  1, z * zaspect}, .texcoord={(1+z)*0.5, 0, 1}, .dotcoord={0, sim_geometry.screen_height}};
+        vertices[s][3] = (volume_vertex_t){.position={  1,  1, z * zaspect}, .texcoord={(1+z)*0.5, 1, 1}, .dotcoord={sim_geometry.screen_width, sim_geometry.screen_height}};
+        vertices[s][4] = vertices[s][2];
+        vertices[s][5] = vertices[s][1];
+    }
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    return sizeof(vertices) / sizeof(volume_vertex_t);
+}
+
+static void init_mesh(void) {
     glGenVertexArrays(1, &volume.vao);
     glGenBuffers(1, &volume.vbo);
 
     glBindVertexArray(volume.vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, volume.vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    if (sim_geometry.scan_geometry == SCAN_LINEAR) {
+        volume.vertex_count = create_mesh_linear();
+    } else {
+        volume.vertex_count = create_mesh_radial();
+    }
 
     GLint a_position = glGetAttribLocation(volume.program, "a_position");
     glVertexAttribPointer(a_position, 3, GL_FLOAT, GL_FALSE, sizeof(volume_vertex_t), (void*)offsetof(volume_vertex_t, position));
@@ -263,10 +404,14 @@ static void init_mesh(void) {
     glEnableVertexAttribArray(a_dotcoord);
 }
 
-bool sim_init(void) {
+
+bool sim_init(int argc, char** argv) {
+    parse_args(argc, argv);
+
     if (!map_volume()) {
         return false;
     }
+    voxel_buffer->bits_per_channel = sim_bpc;
 
     volume.program = create_program(volume_vert, volume_frag);
     if (!volume.program) {
@@ -274,6 +419,7 @@ bool sim_init(void) {
     }
     volume.u_view = glGetUniformLocation(volume.program, "u_view");
     volume.u_proj = glGetUniformLocation(volume.program, "u_proj");
+    volume.u_bpcmask = glGetUniformLocation(volume.program, "u_bpcmask");
 
 
     init_texture();
@@ -330,12 +476,19 @@ void sim_draw(void) {
     mat4_perspective(mat_proj, to_radians(35), (float)viewport_width / (float)viewport_height, 1, 100);
 
     glBindTexture(GL_TEXTURE_3D, volume.texture);
-    glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, VOXELS_Z, VOXELS_X, VOXELS_Y, GL_RED_INTEGER, GL_UNSIGNED_BYTE, voxel_buffer->volume[voxel_buffer->page]);
+
+    for (int y = 0; y < VOXELS_Y; ++y) {
+        // splitting up the texture upload causes less flicker with simultaneous page flips
+        glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, y, VOXELS_Z, VOXELS_X, 1, GL_RED_INTEGER, GL_UNSIGNED_BYTE, &voxel_buffer->volume[voxel_buffer->page][VOXEL_INDEX(0,y,0)]);
+    }
 
     glUseProgram(volume.program);
 
     glUniformMatrix4fv(volume.u_proj, 1, GL_FALSE, (float*)&mat_proj);
     glUniformMatrix4fv(volume.u_view, 1, GL_FALSE, (float*)&mat_view);
+
+    const int bpcmask[4] = {0b11111111, 0b10010010, 0b11011011, 0b11111111};
+    glUniform1i(volume.u_bpcmask, bpcmask[voxel_buffer->bits_per_channel & 3]);
 
     glBindVertexArray(volume.vao);
     glBindBuffer(GL_ARRAY_BUFFER, volume.vbo);
