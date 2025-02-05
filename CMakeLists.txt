@@ -105,7 +105,7 @@ foreach(GLSL_FILE ${GLSL_FILES})
 
     add_custom_command(
         OUTPUT "${GLSL_HEADER}"
-        COMMAND ${CMAKE_COMMAND} -DINPUT_FILE="${GLSL_FILE}" -DOUTPUT_FILE="${GLSL_HEADER}" -P ${CMAKE_SOURCE_DIR}/glsl.cmake
+        COMMAND ${CMAKE_COMMAND} -DINPUT_FILE="${GLSL_FILE}" -DOUTPUT_FILE="${GLSL_HEADER}" -P ${SIMULATOR_SRC_DIR}/glsl.cmake
         DEPENDS "${GLSL_FILE}"
         COMMENT "Wrapping ${GLSL_FILE} to ${GLSL_HEADER}"
     )

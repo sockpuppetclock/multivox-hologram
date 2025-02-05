@@ -10,6 +10,7 @@
 #include <EGL/egl.h>
 
 #include "sim.h"
+#include "rammel.h"
 
 static const char* window_title = "virtex";
 static long event_mask = KeyPressMask|ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|StructureNotifyMask;
@@ -136,9 +137,12 @@ static bool process_events(x11_state_t* x11, egl_state_t* egl) {
     static int mousex = 0;
     static int mousey = 0;
 
-    static bool dragging = false;
-    static int dragx = 0;
-    static int dragy = 0;
+    typedef struct {
+        bool held;
+        int x, y;
+    } drag_t;
+
+    static drag_t dragging[3] = {0};
 
     while (XPending(x11->display)) {
         XEvent xev;
@@ -163,11 +167,14 @@ static bool process_events(x11_state_t* x11, egl_state_t* egl) {
             case ButtonPress: {
                 switch (xev.xbutton.button) {
                     case 1:
-                        dragging = true;
+                    case 2:
+                    case 3:
+                        int b = xev.xbutton.button - 1;
+                        dragging[b].held = true;
                         mousex = xev.xbutton.x;
                         mousey = xev.xbutton.y;
-                        dragx = mousex;
-                        dragy = mousey;
+                        dragging[b].x = mousex;
+                        dragging[b].y = mousey;
                         break;
                     
                     case 4:
@@ -181,19 +188,21 @@ static bool process_events(x11_state_t* x11, egl_state_t* egl) {
             } break;
 
             case ButtonRelease: {
-                if (xev.xbutton.button == 1) {
-                    dragging = false;
+                if (xev.xbutton.button > 0 && xev.xbutton.button <= count_of(dragging)) {
+                    dragging[xev.xbutton.button-1].held = false;
                 }
             } break;
         }
     }
 
-    if (dragging) {
-        if (mousex != dragx || mousey != dragy) {
-            float scale = (float)(x11->attributes.width + x11->attributes.height) * 0.5f;
-            sim_drag((float)(mousex - dragx) / scale, (float)(mousey - dragy) / scale);
-            dragx = mousex;
-            dragy = mousey;
+    for (int i = 0; i < count_of(dragging); ++i) {
+        if (dragging[i].held) {
+            if (mousex != dragging[i].x || mousey != dragging[i].y) {
+                float scale = (float)(x11->attributes.width + x11->attributes.height) * 0.5f;
+                sim_drag(i+1, (float)(mousex - dragging[i].x) / scale, (float)(mousey - dragging[i].y) / scale);
+                dragging[i].x = mousex;
+                dragging[i].y = mousey;
+            }
         }
     }
 

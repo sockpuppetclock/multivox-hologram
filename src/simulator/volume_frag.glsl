@@ -1,34 +1,35 @@
 #version 310 es
 
+precision mediump int;
 precision mediump float;
 precision mediump isampler3D;
 
 uniform isampler3D u_volume;
 uniform int u_bpcmask;
+uniform int u_dotlock;
 
 in vec3 v_texcoord;
 in vec2 v_dotcoord;
+in vec3 v_bpcscale;
 
 out vec4 ql_FragColor;
 
 float dot2(vec2 v) {return dot(v, v);}
 
 void main() {
-    float rsq = dot2(fract(v_dotcoord)-vec2(0.5,0.5));
-    float lum = max(0.0, 0.5 - rsq * 4.0);
+    float rsq = dot2(fract(v_dotcoord)-vec2(0.5, 0.5));
+    float lum = max(0.0, 0.5 - rsq * 2.0);
 
     float dm = v_dotcoord.x + v_dotcoord.y;
-    float dd = min(1.0, 0.25 / dot2(vec2(dFdx(dm), dFdy(dm))));
-    lum = mix(0.5, lum, dd);
+    float dd = min(1.0, 0.125 / dot2(vec2(dFdx(dm), dFdy(dm))));
+    lum = mix(0.125, lum, dd);
 
-    int pix = texture(u_volume, v_texcoord).r;
-    pix &= u_bpcmask;
-
-    vec3 colour = vec3(
-        float((pix&0xe0)>>5) / 7.0,
-        float((pix&0x1c)>>2) / 7.0,
-        float((pix&0x03)<<1) / 7.0
-    );
+    vec3 texcoord = v_texcoord;
+    if (u_dotlock != 0) {
+        texcoord.yz = (texcoord.yz - vec2(0.5, 0.5)) * ((floor(v_dotcoord.x) + 0.5) / v_dotcoord.x) + vec2(0.5, 0.5);
+    }
+    int pix = texture(u_volume, texcoord).r & u_bpcmask;
+    vec3 colour = vec3(float(pix & 0xe0), float(pix & 0x1c), float(pix & 0x03)) * v_bpcscale;
 
     ql_FragColor.rgb = colour * lum;
     ql_FragColor.a = 1.0;

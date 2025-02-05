@@ -25,6 +25,44 @@
 _Static_assert(sizeof(pixel_t)==1, "simulator only supports RGB332");
 _Static_assert(VOXEL_Z_STRIDE==1, "simulator assumes z stride is 1");
 
+
+
+typedef struct {
+    GLuint texture;
+    GLuint vao;
+    GLuint vbo;
+    size_t vertex_count;
+
+    GLuint program;
+    GLuint u_view;
+    GLuint u_proj;
+    GLuint u_bpcmask;
+    GLuint u_brightness;
+} draw_state_t;
+
+typedef struct {
+    GLfloat position[3];
+    GLfloat texcoord[3];
+    GLfloat dotcoord[2];
+} volume_vertex_t;
+
+static draw_state_t volume;
+
+static int volume_fd;
+voxel_double_buffer_t* voxel_buffer;
+
+static int viewport_width = 800;
+static int viewport_height = 600;
+
+static float mat_view[MAT4_SIZE];
+static float mat_proj[MAT4_SIZE];
+
+static vec3_t view_position = {.x=0, .y=0, .z=-3};
+static vec3_t model_rotation = {.x=-M_PI_2, .y=0, .z=0};
+
+static float sim_brightness = 1.0f;
+
+
 typedef enum {
     SCAN_RADIAL,
     SCAN_LINEAR
@@ -70,18 +108,25 @@ int sim_bpc = 2;
 
 static void parse_args(int argc, char** argv) {
     bool help = false;
+    bool sset = false;
+    bool wset = false;
+
     for (int opt = 0; opt != -1; opt = getopt(argc, argv, "o:s:w:g:b:")) {
         switch(opt) {
             case 'o': {
                 sim_geometry.screen_offset[0] = sim_geometry.screen_offset[1] = atof(optarg);
                 if (optind < argc) {
-                    sim_geometry.screen_offset[1] = atof(argv[optind++]);
+                    sim_geometry.screen_offset[1] = atof(argv[optind]);
+                    if (sim_geometry.screen_offset[1] != 0) {
+                        ++optind;
+                    }
                 }
                 sim_geometry.screen_count = 1 + (sim_geometry.screen_offset[0] != sim_geometry.screen_offset[1]);
             } break;
 
             case 's': {
                 sim_geometry.slice_count = clampi(atoi(optarg), 1, 4096);
+                sset = true;
             } break;
 
             case 'w': {
@@ -89,6 +134,7 @@ static void parse_args(int argc, char** argv) {
                     int w = atoi(optarg);
                     int h = atoi(argv[optind++]);
                     if (w > 0 && h > 0) {
+                        wset = true;
                         sim_geometry.screen_width = w;
                         sim_geometry.screen_height = h;
                     }
@@ -119,11 +165,17 @@ static void parse_args(int argc, char** argv) {
                " -w X X   panel resolution (width, height)\n"
                " -o X X   panel offset (front, back)\n"
                " -g X     geometry (radial, linear)\n\n",
-    argv[0]);
-    // -o offset front back
-    // -s slices
-    // -w dimensions w h
+        argv[0]);
+    }
 
+    if (sim_geometry.scan_geometry == SCAN_LINEAR) {
+        if (!sset) {
+            sim_geometry.slice_count = VOXELS_Z;
+        }
+        if (!wset) {
+            sim_geometry.screen_width = VOXELS_X;
+            sim_geometry.screen_height = VOXELS_Y;
+        }
     }
 
     if (sim_geometry.screen_count > 1
@@ -151,38 +203,6 @@ static void parse_args(int argc, char** argv) {
 
 
 
-typedef struct {
-    GLuint texture;
-    GLuint vao;
-    GLuint vbo;
-    size_t vertex_count;
-
-    GLuint program;
-    GLuint u_view;
-    GLuint u_proj;
-    GLuint u_bpcmask;
-} draw_state_t;
-
-typedef struct {
-    GLfloat position[3];
-    GLfloat texcoord[3];
-    GLfloat dotcoord[2];
-} volume_vertex_t;
-
-static draw_state_t volume;
-
-static int volume_fd;
-voxel_double_buffer_t* voxel_buffer;
-
-static int viewport_width = 800;
-static int viewport_height = 600;
-
-static float mat_view[MAT4_SIZE];
-static float mat_proj[MAT4_SIZE];
-
-static float cam_dist = 3.0f;
-static float rot_yaw = 0;
-static float rot_pitch = -M_PI_2;
 
 static void* map_volume() {
     mode_t old_umask = umask(0);
@@ -334,10 +354,10 @@ static size_t create_mesh_radial() {
                 }
             }
 
-            vertices[s][p][0] = (volume_vertex_t){.position={ends[0].x, ends[0].y, -z}, .texcoord={0, (1+ends[0].x)*0.5f, (1+ends[0].y)*0.5f}, .dotcoord={radius * hole, 0.0f}};
-            vertices[s][p][1] = (volume_vertex_t){.position={ends[1].x, ends[1].y, -z}, .texcoord={0, (1+ends[1].x)*0.5f, (1+ends[1].y)*0.5f}, .dotcoord={radius*rim[0], 0.0f}};
-            vertices[s][p][2] = (volume_vertex_t){.position={ends[0].x, ends[0].y,  z}, .texcoord={1, (1+ends[0].x)*0.5f, (1+ends[0].y)*0.5f}, .dotcoord={radius * hole, (float)sim_geometry.screen_height}};
-            vertices[s][p][3] = (volume_vertex_t){.position={ends[1].x, ends[1].y,  z}, .texcoord={1, (1+ends[1].x)*0.5f, (1+ends[1].y)*0.5f}, .dotcoord={radius*rim[0], (float)sim_geometry.screen_height}};
+            vertices[s][p][0] = (volume_vertex_t){.position={ends[0].x, ends[0].y, -z}, .texcoord={0, (1+ends[0].x)*0.5f, (1+ends[0].y)*0.5f}, .dotcoord={radius*rim[0], 0.0f}};
+            vertices[s][p][1] = (volume_vertex_t){.position={ends[1].x, ends[1].y, -z}, .texcoord={0, (1+ends[1].x)*0.5f, (1+ends[1].y)*0.5f}, .dotcoord={radius * hole, 0.0f}};
+            vertices[s][p][2] = (volume_vertex_t){.position={ends[0].x, ends[0].y,  z}, .texcoord={1, (1+ends[0].x)*0.5f, (1+ends[0].y)*0.5f}, .dotcoord={radius*rim[0], (float)sim_geometry.screen_height}};
+            vertices[s][p][3] = (volume_vertex_t){.position={ends[1].x, ends[1].y,  z}, .texcoord={1, (1+ends[1].x)*0.5f, (1+ends[1].y)*0.5f}, .dotcoord={radius * hole, (float)sim_geometry.screen_height}};
             vertices[s][p][4] = vertices[s][p][2];
             vertices[s][p][5] = vertices[s][p][1];
 
@@ -364,10 +384,10 @@ static size_t create_mesh_linear() {
     for (int s = 0; s < sim_geometry.slice_count; ++s) {
         float z = ((((float)s + 0.5f) / (float)(sim_geometry.slice_count)) * 2.0f - 1.0f);
 
-        vertices[s][0] = (volume_vertex_t){.position={ -1, -1, z * zaspect}, .texcoord={(1+z)*0.5, 0, 0}, .dotcoord={0, 0}};
-        vertices[s][1] = (volume_vertex_t){.position={  1, -1, z * zaspect}, .texcoord={(1+z)*0.5, 1, 0}, .dotcoord={sim_geometry.screen_width,0}};
-        vertices[s][2] = (volume_vertex_t){.position={ -1,  1, z * zaspect}, .texcoord={(1+z)*0.5, 0, 1}, .dotcoord={0, sim_geometry.screen_height}};
-        vertices[s][3] = (volume_vertex_t){.position={  1,  1, z * zaspect}, .texcoord={(1+z)*0.5, 1, 1}, .dotcoord={sim_geometry.screen_width, sim_geometry.screen_height}};
+        vertices[s][0] = (volume_vertex_t){.position={ -1, -1, z * zaspect}, .texcoord={(1+z)*0.5, 0, 0}, .dotcoord={-(float)sim_geometry.screen_width*0.5f,-(float)sim_geometry.screen_height*0.5f}};
+        vertices[s][1] = (volume_vertex_t){.position={  1, -1, z * zaspect}, .texcoord={(1+z)*0.5, 1, 0}, .dotcoord={ (float)sim_geometry.screen_width*0.5f,-(float)sim_geometry.screen_height*0.5f}};
+        vertices[s][2] = (volume_vertex_t){.position={ -1,  1, z * zaspect}, .texcoord={(1+z)*0.5, 0, 1}, .dotcoord={-(float)sim_geometry.screen_width*0.5f, (float)sim_geometry.screen_height*0.5f}};
+        vertices[s][3] = (volume_vertex_t){.position={  1,  1, z * zaspect}, .texcoord={(1+z)*0.5, 1, 1}, .dotcoord={ (float)sim_geometry.screen_width*0.5f, (float)sim_geometry.screen_height*0.5f}};
         vertices[s][4] = vertices[s][2];
         vertices[s][5] = vertices[s][1];
     }
@@ -420,7 +440,11 @@ bool sim_init(int argc, char** argv) {
     volume.u_view = glGetUniformLocation(volume.program, "u_view");
     volume.u_proj = glGetUniformLocation(volume.program, "u_proj");
     volume.u_bpcmask = glGetUniformLocation(volume.program, "u_bpcmask");
+    volume.u_brightness = glGetUniformLocation(volume.program, "u_brightness");
 
+    GLuint u_dotlock = glGetUniformLocation(volume.program, "u_dotlock");
+    glUseProgram(volume.program);
+    glUniform1i(u_dotlock, sim_geometry.scan_geometry == SCAN_RADIAL);
 
     init_texture();
     init_mesh();
@@ -452,28 +476,38 @@ void sim_resize(int w, int h) {
     glViewport(0, 0, viewport_width, viewport_height);
 }
 
-void sim_drag(float dx, float dy) {
-    rot_pitch = clampf(rot_pitch + dy * 3, -M_PI*0.95f, -M_PI*0.05f);
-    rot_yaw = fmodf(rot_yaw + dx * 3, M_PI * 2);
+void sim_drag(int button, float dx, float dy) {
+    switch (button) {
+        case 1:
+            model_rotation.x = clampf(model_rotation.x + dy * 3, -M_PI*0.95f, -M_PI*0.05f);
+            model_rotation.z = fmodf(model_rotation.z + dx * 3, M_PI * 2);
+            break;
+
+        case 2:
+            view_position.x = clampf(view_position.x + dx, -1.0f, 1.0f);
+            view_position.y = clampf(view_position.y - dy, -1.0f, 1.0f);
+            break;
+        
+    }
 }
 
 void sim_zoom(float d) {
-    cam_dist = clampf(cam_dist - d, 1.0f, 10.0f);
+    view_position.z = clampf(view_position.z + d, -10.0f, -0.1f);
 }
 
 void sim_draw(void) {
     float matrix[MAT4_SIZE];
     
     mat4_identity(matrix);
-    mat4_rotation_z(matrix, rot_yaw);
+    mat4_rotation_z(matrix, model_rotation.z);
 
     mat4_identity(mat_view);
-    mat4_rotation_x(mat_view, rot_pitch);
+    mat4_rotation_x(mat_view, model_rotation.x);
     mat4_multiply(mat_view, mat_view, matrix);
 
-    mat4_translate(mat_view, mat_view, (float[3]){0, 0, -cam_dist});
+    mat4_translate(mat_view, mat_view, view_position.v);
 
-    mat4_perspective(mat_proj, to_radians(35), (float)viewport_width / (float)viewport_height, 1, 100);
+    mat4_perspective(mat_proj, to_radians(35), (float)viewport_width / (float)viewport_height, 0.1f, 100.0f);
 
     glBindTexture(GL_TEXTURE_3D, volume.texture);
 
@@ -489,6 +523,8 @@ void sim_draw(void) {
 
     const int bpcmask[4] = {0b11111111, 0b10010010, 0b11011011, 0b11111111};
     glUniform1i(volume.u_bpcmask, bpcmask[voxel_buffer->bits_per_channel & 3]);
+
+    glUniform1f(volume.u_brightness, sim_brightness);
 
     glBindVertexArray(volume.vao);
     glBindBuffer(GL_ARRAY_BUFFER, volume.vbo);
