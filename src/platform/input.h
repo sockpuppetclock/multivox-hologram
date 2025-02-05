@@ -38,12 +38,13 @@ typedef enum {
     BUTTON_HELD = 4
 } button_event_t;
 
+#define CONTROLLERS_MAX 4
 typedef uint8_t controller_id_t;
 
 void input_set_nonblocking(void);
 bool input_get_button(controller_id_t controller, button_t button, button_event_t event);
 float input_get_axis(controller_id_t controller, axis_t axis);
-bool input_get_combo(const uint8_t* combo, uint8_t combo_length);
+bool input_get_combo(controller_id_t controller, const uint8_t* combo, uint8_t combo_length);
 void input_update(void);
 
 #endif

@@ -146,7 +146,7 @@ void grid_draw(pixel_t* volume) {
                 occupant_t o = occupants[cell->occupant & (OCCUPANT_TYPES-1)];
                 int height = o.height;
                 if (cell->occupant >= OCCUPANT_SCOOTER_0) {
-                    height *= ease_out_elastic((float)(timer_frame_time - cell->spawned) * 0.0001f) * 2.0f - 1.0f;
+                    height *= ease_out_elastic((float)(timer_frame_time - cell->spawned) * 0.0001f);
                 }
                 height = max(1, height);
 

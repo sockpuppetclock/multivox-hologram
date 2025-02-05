@@ -40,10 +40,10 @@ void main_update(float dt) {
     input_update();
     carousel_update(dt);
 
-    if (input_get_combo(combo_shutdown, sizeof(combo_shutdown))) {
+    if (input_get_combo(0, combo_shutdown, sizeof(combo_shutdown))) {
         system("sudo shutdown -P now");
     }
-    if (input_get_combo(combo_reboot, sizeof(combo_reboot))) {
+    if (input_get_combo(0, combo_reboot, sizeof(combo_reboot))) {
         system("sudo reboot");
     }
 }
