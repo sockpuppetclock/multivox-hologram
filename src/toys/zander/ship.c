@@ -46,7 +46,7 @@ const float ship_cannon_vector[VEC3_SIZE] = {1, 0, 0};
 
 static const float ship_yaw_speed = M_PI * 10.0f;
 static const float ship_pitch_max = M_PI * 0.55f;
-static const float ship_thrust_max = 10.0f;
+static const float ship_thrust_max = 30.0f;
 static const float ship_exhaust_rate = 0.1f;
 static const float ship_exhaust_speed = 6.0f;
 static const float ship_bullet_speed = 8.0f;
@@ -118,7 +118,8 @@ void ship_update(float dt) {
         vec3_transform(engine, ship_engine_vector, matrix);
                 
         float thrust[VEC3_SIZE];
-        vec3_multiply_f(thrust, engine, -control_thrust * ship_thrust_max * dt);
+        float max_thrust = ship_thrust_max / max(1.0f, ship_position.z * 0.5f);
+        vec3_multiply_f(thrust, engine, -control_thrust * max_thrust * dt);
 
         vec3_add(ship_velocity.v, ship_velocity.v, thrust);
 

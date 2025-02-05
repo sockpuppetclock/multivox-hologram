@@ -30,6 +30,14 @@ static pixel_t current_tile_colour = 0;
 [[maybe_unused]] static const pixel_t colour_sand = RGBPIX(255,255,0);
 [[maybe_unused]] static const pixel_t colour_launchpad = RGBPIX(127,127,127);
 
+static uint16_t bit_reverse(uint16_t n) {
+    n = ((n & 0xAAAA) >>  1) | ((n & 0x5555) << 1);
+    n = ((n & 0xCCCC) >>  2) | ((n & 0x3333) << 2);
+    n = ((n & 0xF0F0) >>  4) | ((n & 0x0F0F) << 4);
+    n = ((n & 0xFF00) >>  8) | ((n & 0x00FF) << 8);
+    return n;
+}
+
 int32_t zsin(int32_t v) {
     // I'm getting something wrong here - I think it should be v >> 22, but this is visually closer in horizontal scale
     return zsinTable[(v >> 21) & 1023];
@@ -206,30 +214,27 @@ void draw_ground(pixel_t* volume) {
 extern vec3_t ship_position;
 
 void draw_stars(pixel_t* volume) {
-    float tile0[VEC2_SIZE] = {floorf((-(VOXELS_X-1)*0.5f) / world_scale + world_position.x),
-                              floorf((-(VOXELS_Y-1)*0.5f) / world_scale + world_position.y)};
+    vec2i_t tile0 = {.x=floorf((-(VOXELS_X-1)*0.5f) / world_scale + world_position.x),
+                     .y=floorf((-(VOXELS_Y-1)*0.5f) / world_scale + world_position.y)};
 
     int tiles = (int)ceilf((float)VOXELS_X / world_scale) + 1;
 
-    float star[3] = {tile0[0], tile0[1], 0};
+    vec3_t star = {.x=tile0.x, .y=tile0.y};
 
     for (int y = 0; y < tiles; ++y) {
-        star[0] = tile0[0];
         for (int x = 0; x < tiles; ++x) {
-            star[2] = fabsf(fmodf(star[0] * 86743 + star[1] * 39916801, 31));
+            star.x = tile0.x + x;
+            star.y = tile0.y + y;
+            star.z = sqrtf(fabsf(fmodf((float)bit_reverse(tile0.x+x) * 3.0f + (float)bit_reverse(tile0.y+y) * 7.0f, 1987))) + terrain_max_height;
 
-            int32_t voxel[VEC3_SIZE];
-            voxel_from_world(voxel, star);
-            
-            voxel[2] &= ((VOXELS_Z * 4) - 1);
+            vec3i_t voxel;
+            voxel_from_world(voxel.v, star.v);
 
-            if ((uint32_t)voxel[0] < VOXELS_X && (uint32_t)voxel[1] < VOXELS_Y && (uint32_t)voxel[2] < VOXELS_Z) {
-                volume[VOXEL_INDEX(voxel[0], voxel[1], voxel[2])] = 255;
+            if ((uint32_t)voxel.x < VOXELS_X && (uint32_t)voxel.y < VOXELS_Y && (uint32_t)voxel.z < VOXELS_Z) {
+                volume[VOXEL_INDEX(voxel.x, voxel.y, voxel.z)] = RGBPIX(255,255,255);
             }
 
-            star[0] += 1;
         }
-        star[1] += 1;
     }
 }
 
@@ -238,10 +243,6 @@ void terrain_init(void) {
 
 void terrain_draw(pixel_t* volume) {
 
-    if (world_position.z < terrain_max_height) {
-        draw_ground(volume);
-    } else {
-        memset(height_map, -127, sizeof(height_map));
-        draw_stars(volume);
-    }
+    draw_ground(volume);
+    draw_stars(volume);
 }
