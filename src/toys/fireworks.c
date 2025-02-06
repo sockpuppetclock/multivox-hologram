@@ -94,7 +94,7 @@ void spawn_rocket(int i) {
 
     balls[i].velocity.x = (float)((rand()&31)-15) * 0.001f;
     balls[i].velocity.y = (float)((rand()&31)-15) * 0.001f;
-    balls[i].velocity.z = (float)((rand()&3)+2) * 0.025f;
+    balls[i].velocity.z = (float)((rand()&3)+2) * (VOXELS_Z / 2560.0f);
 
     balls[i].radius = ROCKET_RADIUS;
     

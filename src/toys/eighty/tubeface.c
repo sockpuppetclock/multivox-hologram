@@ -123,7 +123,7 @@ void tubeface_draw(pixel_t* volume) {
     graphics_draw_voxel_cb = draw_voxel;
 
     mat4_identity(matrix);
-    mat4_apply_translation(matrix, (float[3]){VOXELS_X*0.5f, VOXELS_Y*0.5f, VOXELS_Z*0.5f});
+    mat4_apply_translation(matrix, (float[3]){VOXELS_X*0.5f, VOXELS_Y*0.5f, 32});
     model_draw(volume, &model_tubeface, matrix);
 
     graphics_draw_voxel_cb = NULL;
