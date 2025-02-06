@@ -11,6 +11,7 @@
 
 #include "sim.h"
 #include "rammel.h"
+#include "timer.h"
 
 static const char* window_title = "virtex";
 static long event_mask = KeyPressMask|ButtonPressMask|ButtonReleaseMask|PointerMotionMask|ExposureMask|StructureNotifyMask;
@@ -111,6 +112,8 @@ static bool init_egl(const x11_state_t* x11, egl_state_t* egl) {
     }
 
     resize_egl(x11, egl);
+
+    eglSwapInterval(egl->display, 1);
 
     EGLint value;
     if (!eglQueryContext(egl->display, egl->context, EGL_RENDER_BUFFER, &value)) {
@@ -230,15 +233,24 @@ int main(int argc, char** argv) {
     if (!sim_init(argc, argv)) {
         return 1;
     }
+#ifdef PROFILE
+    timespec_t timer = timer_time_now();
+    int perf = 0;
+#endif
 
     do {
-        //glClearColor(0.0f, (float)(rand()&0xff) / 255.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         sim_draw();
 
         eglSwapBuffers(egl.display, egl.surface);
 
+#ifdef PROFILE
+        if (++perf >= 16) {
+            printf("%d ms\n", timer_elapsed_ms(&timer) / perf);
+            perf = 0;
+        }
+#endif
     } while (process_events(&x11, &egl));
 
     close_egl(&egl);

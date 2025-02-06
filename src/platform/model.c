@@ -13,6 +13,7 @@
 #include "rammel.h"
 #include "array.h"
 #include "image.h"
+#include "timer.h"
 
 typedef struct {
     float x, y, rsq;
@@ -343,7 +344,7 @@ static void clear_scratch_arrays() {
 }
 
 model_t* model_load(const char* filename, const model_style_t style) {
-    clock_t time_start = clock();
+    timespec_t timer = timer_time_now();
 
     FILE* fd = fopen(filename, "r");
     if (!fd) {
@@ -503,7 +504,8 @@ model_t* model_load(const char* filename, const model_style_t style) {
         vertex_tuple_t* ivert = array_get(&scratch_vertices, i);
         printf("%d %d %d\n", ivert->x, ivert->y, ivert->z);
     }*/
-    printf("v %ld  e %ld  s %ld   %ld ms\n", scratch_vertices.count, scratch_edges.count, scratch_surfaces.count, (clock() - time_start) / 1000);
+   
+    printf("v %ld  e %ld  s %ld   %d ms\n", scratch_vertices.count, scratch_edges.count, scratch_surfaces.count, timer_elapsed_ms(&timer));
 
     array_clear(&scratch_vertices);
     array_clear(&scratch_edges);
@@ -595,7 +597,7 @@ void model_draw(pixel_t* volume, const model_t* model, float* matrix) {
     }
     scratch_positions.count = 0;
 
-    //clock_t time_start = clock();
+    //timespec_t timer = timer_time_now();
 
     vec3_t* transformed = scratch_positions.data;
     for (uint i = 0; i < model->vertex_count; ++i) {
@@ -622,7 +624,7 @@ void model_draw(pixel_t* volume, const model_t* model, float* matrix) {
         }
     }
 
-    //printf("%ld ms\n", (clock() - time_start) / 1000);
+    //printf("%ld ms\n", timer_elapsed_ms(&timer));
 }
 
 static circlesq_t circle_from_1(const vec2_t* point) {
@@ -815,6 +817,22 @@ void model_dump(model_t* model) {
 
         printf("    },\n");
     }
+
+    if (model->edge_count > 0) {
+        printf("#define E_ RGBPIX(255,255,255)\n");
+        printf("    .edge_count = %d,\n", model->edge_count);
+        printf("    .edges = (edge_t[]){\n");
+
+        for (int i = 0; i < model->edge_count; ++i) {
+            if ((i % 16) == 0) {
+                printf("\n        ");
+            }
+            printf("{{%d, %d}, E_}, ", model->edges[i].index[0], model->edges[i].index[1]);
+        }
+        printf("\n    }\n");
+        printf("#undef E_\n");
+    }
+
     printf("};\n");
 
 }

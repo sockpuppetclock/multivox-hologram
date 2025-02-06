@@ -80,7 +80,7 @@ function(add_toy toy)
     add_cart(${toy} "")
 endfunction()
 
-add_cart(viewer ${MULTIVOX_INSTALL_DIR}/models/*.obj)
+add_cart(viewer "${MULTIVOX_INSTALL_DIR}/models/*.obj ${MULTIVOX_INSTALL_DIR}/images/*.png")
 
 add_toy(viewer)
 add_toy(zander)
@@ -90,6 +90,8 @@ add_toy(flight)
 add_toy(fireworks)
 
 
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/models/ DESTINATION ${MULTIVOX_INSTALL_DIR}/models)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/images/ DESTINATION ${MULTIVOX_INSTALL_DIR}/images FILES_MATCHING PATTERN "*.png")
 
 
 set(SIMULATOR_SRC_DIR ${SRC_DIR}/simulator)

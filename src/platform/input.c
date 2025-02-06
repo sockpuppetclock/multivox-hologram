@@ -172,12 +172,8 @@ void input_update(void) {
         }
     }
 
-    static clock_t time_prev = {0};
-    clock_t time_curr = clock();
-    clock_t elapsed = time_curr - time_prev;
-    time_prev = time_curr;
-    
-    if (elapsed > CLOCKS_PER_SEC) {
+    static timespec_t timer = {0};
+    if (timer_elapsed_ms(&timer) > 1000) {
         // discard any button presses that happened during that suspiciously long pause
         memset(input_controllers->button_states, 0, sizeof(input_controllers->button_states));
     }

@@ -26,6 +26,7 @@ typedef uint16_t pixel_t;
 #define B_PIX(a) B565(a)
 
 #define RGBPIX(r,g,b) RGB565(r,g,b)
+#define HEXPIX(hex) RGB565(((int)(0x##hex & 0xFF0000)>>16), ((int)(0x##hex & 0xFF00)>>8), (int)(0x##hex & 0xFF))
 
 #define R_MTH_BIT(p, b) (((p)>>(15-b))&1)
 #define G_MTH_BIT(p, b) (((p)>>(10-b))&1)
@@ -44,6 +45,7 @@ typedef uint8_t pixel_t;
 #define B_PIX(a) B332(a)
 
 #define RGBPIX(r,g,b) RGB332(r,g,b)
+#define HEXPIX(hex) RGB332(((int)(0x##hex & 0xFF0000)>>16), ((int)(0x##hex & 0xFF00)>>8), (int)(0x##hex & 0xFF))
 
 #define R_MTH_BIT(p, b) (((p)>>(7-b))&1)
 #define G_MTH_BIT(p, b) (((p)>>(4-b))&1)

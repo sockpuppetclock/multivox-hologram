@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include <math.h>
 #include <sys/wait.h>
+#include <glob.h>
 
 #include "mathc.h"
 #include "rammel.h"
@@ -49,7 +50,25 @@ static int scene_count = 0;
 static char** scene_list = NULL;
 static int scene_current = 0;
 
-static model_t* scene_model = NULL;
+static model_t fallback_model = {
+    .vertex_count = 12,
+    .vertices = (vertex_t*)(float[][5]){
+        {-8.29155, -25.5192, -13.4164, 0, 0}, {0, -0, -30, 0, 0}, {21.708, -15.7716, -13.4164, 0, 0}, {21.708, 15.7716, -13.4164, 0, 0}, {-26.8328, -0, -13.4164, 0, 0}, {-8.29155, 25.5192, -13.4164, 0, 0},
+        {26.8328, -0, 13.4164, 0, 0}, {8.29155, -25.5192, 13.4164, 0, 0}, {-21.708, -15.7716, 13.4164, 0, 0}, {-21.708, 15.7716, 13.4164, 0, 0}, {8.29155, 25.5192, 13.4164, 0, 0}, {0, -0, 30, 0, 0}, 
+    },
+    .edge_count = 30,
+    .edges = (edge_t[]){
+        {{ 0, 1}, HEXPIX(AAFFAA)}, {{ 1, 2}, HEXPIX(00FF00)}, {{ 0, 2}, HEXPIX(FF55AA)}, {{ 2, 3}, HEXPIX(55AA55)}, {{ 1, 3}, HEXPIX(AAFF55)},
+        {{ 1, 4}, HEXPIX(55AAFF)}, {{ 0, 4}, HEXPIX(AAAA55)}, {{ 1, 5}, HEXPIX(FFFF00)}, {{ 4, 5}, HEXPIX(FF55FF)}, {{ 3, 5}, HEXPIX(555555)},
+        {{ 2, 6}, HEXPIX(55FFFF)}, {{ 3, 6}, HEXPIX(AAFFFF)}, {{ 0, 7}, HEXPIX(FFAAFF)}, {{ 2, 7}, HEXPIX(FF0000)}, {{ 4, 8}, HEXPIX(55AAAA)},
+        {{ 0, 8}, HEXPIX(5555AA)}, {{ 5, 9}, HEXPIX(AA55AA)}, {{ 4, 9}, HEXPIX(FF5555)}, {{ 3,10}, HEXPIX(5555FF)}, {{ 5,10}, HEXPIX(FFAA55)},
+        {{ 6, 7}, HEXPIX(FFFFAA)}, {{ 7, 8}, HEXPIX(FFAAAA)}, {{ 8, 9}, HEXPIX(AAAAFF)}, {{ 9,10}, HEXPIX(AA55FF)}, {{ 6,10}, HEXPIX(55FFAA)},
+        {{ 7,11}, HEXPIX(FFFF55)}, {{ 6,11}, HEXPIX(0000FF)}, {{ 8,11}, HEXPIX(AAAAAA)}, {{ 9,11}, HEXPIX(55FF55)}, {{10,11}, HEXPIX(AA5555)}, 
+    }
+};
+
+static model_t* scene_model = &fallback_model;
+
 
 static bool is_model(const char* filename) {
     const char* ext = strrchr(filename, '.');
@@ -97,7 +116,7 @@ static void zoom_to_fit() {
     printf("zoom %g, offset %g,%g,%g\n", model_scale, model_position[0], model_position[1], model_position[2]);
 }
 
-model_t* load_scene(char* scene) {
+static model_t* load_scene(char* scene) {
     model_t* model = NULL;
 
     printf("loading %s\n", scene);
@@ -128,7 +147,7 @@ model_t* load_scene(char* scene) {
 }
 
 
-void vox_rotate_z(float angle) {
+static void vox_rotate_z(float angle) {
     pixel_t* src = voxel_buffer_get(VOXEL_BUFFER_BACK);
     pixel_t* dst = voxel_buffer_get(VOXEL_BUFFER_FRONT);
 
@@ -168,7 +187,7 @@ static int temperature_base = 0;
 static int temperature_cpu = 0;
 static bool monitor_temperature = true;
 
-void* temperature_worker(void *vargp) {
+static void* temperature_worker(void *vargp) {
     while (monitor_temperature) {
         char buffer[256];
         FILE* fp;
@@ -206,14 +225,44 @@ void* temperature_worker(void *vargp) {
     return NULL;
 }
 
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        printf("no scene specified\n");
-        exit(1);
+static void parse_arguments(int argc, char** argv) {
+    glob_t glob_result;
+    memset(&glob_result, 0, sizeof(glob_result));
+    int file_count = 0;
+    char **file_list = NULL;
+    
+    for (int i = 1; i < argc; ++i) {
+        int ret = glob(argv[i], GLOB_TILDE, NULL, &glob_result);
+        if (ret != 0) {
+            printf("glob failed: %d\n", ret);
+            globfree(&glob_result);
+            continue;
+        }
+        
+        file_list = realloc(file_list, (file_count + glob_result.gl_pathc) * sizeof(char*));
+        if (!file_list) {
+            printf("realloc failed\n");
+            globfree(&glob_result);
+            return;
+        }
+        
+        for (size_t j = 0; j < glob_result.gl_pathc; ++j) {
+            file_list[file_count + j] = strdup(glob_result.gl_pathv[j]);
+        }
+        
+        file_count += glob_result.gl_pathc;
+        globfree(&glob_result);
     }
+    
+    if (file_list) {
+        scene_count = file_count;
+        scene_list = file_list;
+    }
+}
 
-    scene_count = argc - 1;
-    scene_list = &argv[1];
+int main(int argc, char** argv) {
+
+    parse_arguments(argc, argv);
 
     if (!voxel_buffer_map()) {
         printf("waiting for voxel buffer\n");
@@ -223,7 +272,9 @@ int main(int argc, char** argv) {
     }
 
     scene_current = 0;
-    scene_model = load_scene(scene_list[scene_current]);
+    if (scene_count > 0) {
+        scene_model = load_scene(scene_list[scene_current]);
+    }
     home_pose();
 
     mfloat_t centre[VEC3_SIZE] = {(VOXELS_X-1)*0.5f, (VOXELS_Y-1)*0.5f, (VOXELS_Z-1)*0.5f};
@@ -329,13 +380,15 @@ int main(int argc, char** argv) {
             scene_target += 1;
         }
 
-        scene_target = modulo(scene_target, scene_count);
-        if (scene_current != scene_target || scene_reload) {
-            scene_current = scene_target;
+        if (scene_count > 0) {
+            scene_target = modulo(scene_target, scene_count);
+            if (scene_current != scene_target || scene_reload) {
+                scene_current = scene_target;
 
-            model_free(scene_model);
-            scene_model = load_scene(scene_list[scene_current]);
-            home_pose();
+                model_free(scene_model);
+                scene_model = load_scene(scene_list[scene_current]);
+                home_pose();
+            }
         }
 
         switch (navigation_style) {
