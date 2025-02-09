@@ -1,6 +1,24 @@
 #ifndef _COLSCATTER_H_
 #define _COLSCATTER_H_
 
+//
+// This lookup table defines the line refresh order for a gadget with two panels mirrored across the axis, with their scanlines vertical.
+// It only supports 128x64 panels with 1:32 multiplexing. It's used to distribute scanline updates evenly by area - outer columns need
+// to be refreshed more frequently than inner columns in a rotating display to maintain a uniform density.
+//
+// In the ideal case, the panels would allow addressing of each scanline individually. The update strategy for a vertical rotating panel
+// would then be to loop through every value up to the square of the column count, and update the column corresponding to the integer square
+// root of the counter. The counter would be bit reversed, or incremented by some coprime value, to scatter the update evenly.
+//
+// In practice these panels update two scanlines simultaneously, half a screen apart. Since we want to update the outer columns more
+// frequently than the inner columns, we need to scan out black on the inner columns during some of our updates. To come up with a refresh
+// order that handles this constraint I ended up generating these lookup tables using simulated annealing with some terrible python code.
+// The longer sequence uses the actual LED radii (1, 3, 5, 7) and the shorter one uses an approximation (1, 2, 3, 4). Visually I don't think
+// you can tell the difference, so I ended up using the shorter sequence.
+//
+// In these tables, column indices below 32 update both scanlines, and indices above that only update the outer scanline.
+//
+
 /*
 // 1 3 5 7 ... 127
 static const uint8_t colscatter[] = {

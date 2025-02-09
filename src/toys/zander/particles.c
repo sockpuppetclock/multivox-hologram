@@ -50,13 +50,13 @@ void particles_add(const float* position, const float* velocity, particle_type_t
 
     switch (type) {
         case PARTICLE_BULLET: {
-            particle->colour = RGBPIX(255,255,128);
+            particle->colour = HEXPIX(FFFFAA);
             particle->lifespan = 20 * tick_scale;
             particle->flags = PARTICLE_SPLASHES | PARTICLE_BOUNCES /*| PARTICLE_DROPS*/ | PARTICLE_DESTROYS | PARTICLE_BIG_SPLASH | PARTICLE_EXPLODES;
         } break;
 
         case PARTICLE_EXHAUST: {
-            particle->colour = RGBPIX(255,255,255);
+            particle->colour = HEXPIX(FFFFFF);
             particle->lifespan = rand_range(8, 8+8) * tick_scale;
             particle->flags = PARTICLE_COOL_DOWN | PARTICLE_SPLASHES | PARTICLE_BOUNCES | PARTICLE_DROPS;
             randomise_velocity(particle->velocity.v, 0x400000 * velocity_scale);
@@ -73,7 +73,7 @@ void particles_add(const float* position, const float* velocity, particle_type_t
         } break;
 
         case PARTICLE_SPARK: {
-            particle->colour = RGBPIX(255,255,255);
+            particle->colour = HEXPIX(FFFFFF);
             particle->lifespan = rand_range(8 , 8+8) * tick_scale;
             particle->flags = PARTICLE_COOL_DOWN | PARTICLE_SPLASHES | PARTICLE_BOUNCES | PARTICLE_DROPS;
             randomise_velocity(particle->velocity.v, 0x1000000 * velocity_scale);
@@ -98,7 +98,7 @@ void particles_add(const float* position, const float* velocity, particle_type_t
         } break;
 
         case PARTICLE_ROCK: {
-            particle->colour = RGBPIX(255,255,127);
+            particle->colour = HEXPIX(FFFF55);
             particle->lifespan = rand_range(170, 170+32) * tick_scale;
             particle->flags = PARTICLE_SPLASHES | PARTICLE_BOUNCES | PARTICLE_DROPS | PARTICLE_DESTROYS | PARTICLE_BIG_SPLASH | PARTICLE_EXPLODES;
             randomise_velocity(particle->velocity.v, 0x400000 * velocity_scale);

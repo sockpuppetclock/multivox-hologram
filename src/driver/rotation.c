@@ -28,8 +28,10 @@ int32_t rotation_drift = 0;
 int compare_ints(const void *a, const void *b) {
     return *((int*)a) - *((int*)b);
 }
-/* separate sync halves?
+
+#ifdef SYNC_PULSE_UNEQUAL
 static uint32_t median_period() {
+    // treat the rising and falling edges separately
     static uint32_t sorted[2][count_of(rotation_history[0])];
     memcpy(sorted, rotation_history, sizeof(sorted));
     for (int i = 0; i < 2; ++i) {
@@ -38,7 +40,8 @@ static uint32_t median_period() {
     
     return (sorted[0][(count_of(rotation_history[0])-1)/2] + sorted[0][count_of(rotation_history[0])/2]
           + sorted[1][(count_of(rotation_history[0])-1)/2] + sorted[1][count_of(rotation_history[0])/2]) / 2;
-}*/
+}
+#else
 static uint32_t median_period() {
     static uint32_t sorted[count_of(rotation_history)];
     memcpy(sorted, rotation_history, sizeof(sorted));
@@ -46,6 +49,7 @@ static uint32_t median_period() {
     
     return (sorted[(count_of(rotation_history)-1)/2] + sorted[count_of(rotation_history)/2]);
 }
+#endif
 
 uint32_t rotation_current_angle(void) {
     uint32_t tick_curr = *timer_uS;

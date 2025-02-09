@@ -75,7 +75,7 @@ static voxel_double_buffer_t* volume_buffer;
 
 static void* map_volume() {
     mode_t old_umask = umask(0);
-    volume_fd = shm_open("/rotovox_double_buffer", O_CREAT | O_RDWR, 0666);
+    volume_fd = shm_open("/vortex_double_buffer", O_CREAT | O_RDWR, 0666);
     umask(old_umask);
     if (volume_fd == -1) {
         perror("shm_open");
@@ -217,7 +217,7 @@ typedef const pixel_t* scanline_stack_t[TRAIL_STACK][PANEL_COUNT][PANEL_MULTIPLE
 // column and each column fits in one or two cache lines, so we can scan out
 // directly from the volume.
 // With horizontal panels we need to read an entire slice column by column
-// and store it in row order just ahead of the sweep.
+// and convert it to row order just ahead of the sweep.
 static bool slicer_running = true;
 static slice_index_t slice_angle = 0;
 
@@ -231,7 +231,7 @@ void* slicer_worker(void *vargp) {
         perror("sched_setaffinity");
     }
 
-    int fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
+    int fd = shm_open("/vortex_double_buffer", O_RDWR, 0666);
     if (fd == -1) {
         perror("shm_open");
         slicer_running = false;
@@ -436,7 +436,7 @@ static void init_angles(void) {}
 
 #ifndef ADDR_CLK
 
-// classic Hub75 direct row address
+// classic HUB75E direct row address
 static void set_matrix_row(uint row) {
 
     uint a = PANEL_FIELD_HEIGHT - 1 - row;
@@ -594,10 +594,6 @@ int main(int argc, char** argv) {
                     gpio_clear_bits(((~rgbbits) & RGB_BITS_MASK) | RGB_CLOCK_MASK | ((c==unblank[b]) << RGB_BLANK));
                     gpio_set_bits(rgbbits & RGB_BITS_MASK);
                     
-//tiny_wait(400); //60
-//tiny_wait(200); //120
-//tiny_wait(90); //240
-//tiny_wait(40); //480
                     tiny_wait((CLOCK_WAITS  )/2);
 
                     gpio_set_pin(RGB_CLOCK);

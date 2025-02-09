@@ -238,7 +238,7 @@ static void load_mtllib(const char* path, const char* mtlfile) {
             material_t* material = array_push(&scratch_materials);
             memset(material, 0, sizeof(material_t));
             material->name = strdup(&line[7]);
-            material->colour = RGBPIX(200, 200, 255);
+            material->colour = HEXPIX(AAAAFF);
 
         } else if (strncasecmp(line, "map_Kd ", 7) == 0) {
             if (scratch_materials.count) {
@@ -290,7 +290,7 @@ static void add_surface(array_t* surfaces, const char* mtl) {
             surface->colour = hash_colour(mtl);
         }
     } else {
-        surface->colour = RGBPIX(0x55, 0xaa, 0xff);
+        surface->colour = HEXPIX(55AAFF);
     }
 }
 
@@ -553,7 +553,7 @@ model_t* model_load_image(const char* filename) {
 
     model->surface_count = 1;
     model->surfaces = malloc(model->surface_count * sizeof(surface_t));
-    model->surfaces[0].colour = RGBPIX(255,255,255);
+    model->surfaces[0].colour = HEXPIX(FFFFFF);
     model->surfaces[0].index_count = 6;
     model->surfaces[0].indices = malloc(model->surfaces[0].index_count * sizeof(index_t));
 
@@ -819,7 +819,7 @@ void model_dump(model_t* model) {
     }
 
     if (model->edge_count > 0) {
-        printf("#define E_ RGBPIX(255,255,255)\n");
+        printf("#define E_ HEXPIX(FFFFFF)\n");
         printf("    .edge_count = %d,\n", model->edge_count);
         printf("    .edges = (edge_t[]){\n");
 

@@ -45,7 +45,7 @@ static void load_tiles(void) {
                 strncpy(filename, entry->d_name, tiles_dir + sizeof(tiles_dir) - 2 - filename);
                 
                 model_t* model = model_load(tiles_dir, STYLE_WIREFRAME_ALWAYS);
-                model_set_colour(model, RGBPIX(127,255,255));
+                model_set_colour(model, HEXPIX(55FFFF));
                 *(model_t**)array_push(&tile_set) = model;
             }
         }

@@ -26,9 +26,9 @@ static const float TILE_SCALE = 1.0f / (float)TILE_SIZE;
 static const float terrain_max_height = 10.0f;
 
 static pixel_t current_tile_colour = 0;
-[[maybe_unused]] static const pixel_t colour_sea = RGBPIX(63,63,255);
-[[maybe_unused]] static const pixel_t colour_sand = RGBPIX(255,255,0);
-[[maybe_unused]] static const pixel_t colour_launchpad = RGBPIX(127,127,127);
+[[maybe_unused]] static const pixel_t colour_sea = HEXPIX(3F3FFF);
+[[maybe_unused]] static const pixel_t colour_sand = HEXPIX(FFFF00);
+[[maybe_unused]] static const pixel_t colour_launchpad = HEXPIX(7F7F7F);
 
 static uint16_t bit_reverse(uint16_t n) {
     n = ((n & 0xAAAA) >>  1) | ((n & 0x5555) << 1);
@@ -187,7 +187,7 @@ void draw_ground(pixel_t* volume) {
 #ifdef CHEESY_WAVES
                 //if ((x^y)&1) {
                     #define WAVE_PERIOD_MS (2500)
-                    #define WAVE_HEIGHT (0.2f)
+                    #define WAVE_HEIGHT (0.25f)
                     #define CREST_HEIGHT (WAVE_HEIGHT * 0.95f)
                     float depth = terrain_get_altitude_raw(pos.x, pos.y);
                     float crest = depth + sinf((((timer_frame_time + (int32_t)(pos.y*2000)) % (WAVE_PERIOD_MS * 256)) * 2 * M_PI / WAVE_PERIOD_MS) + depth*depth*16);
@@ -195,10 +195,9 @@ void draw_ground(pixel_t* volume) {
                         crest = powf(crest, 0.1f) * WAVE_HEIGHT;
                         if (crest > CREST_HEIGHT) {
                             //particles_add(pos.v, (float[3]){0,0,0}, PARTICLE_SPRAY);
-                            colour = RGBPIX(191,191,255);
+                            colour = HEXPIX(BFBFFF);
                         }
                         
-                        crest = min(crest, depth * -0.25f);
                         z = ((crest - world_position.z) * world_scale) + dither;
                     }
                 //}
@@ -231,7 +230,7 @@ void draw_stars(pixel_t* volume) {
             voxel_from_world(voxel.v, star.v);
 
             if ((uint32_t)voxel.x < VOXELS_X && (uint32_t)voxel.y < VOXELS_Y && (uint32_t)voxel.z < VOXELS_Z) {
-                volume[VOXEL_INDEX(voxel.x, voxel.y, voxel.z)] = RGBPIX(255,255,255);
+                volume[VOXEL_INDEX(voxel.x, voxel.y, voxel.z)] = HEXPIX(FFFFFF);
             }
 
         }

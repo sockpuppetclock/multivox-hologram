@@ -5,7 +5,7 @@
 
 #define TILES_COMPILED
 
-#define E_ RGBPIX(127,255,255)
+#define E_ HEXPIX(55FFFF)
 
 static const model_t tile_models[] = {
     {
@@ -187,7 +187,7 @@ static const model_t tile_models[] = {
         .surfaces = (surface_t[]){
             {15, (index_t[]){
                 41, 141, 145, 59, 46, 166, 166, 46, 48, 278, 276, 280, 63, 136, 133, 
-            }, RGBPIX(255, 255, 255)},
+            }, HEXPIX(FFFFFF)},
         },
         .edge_count = 591,
         .edges = (edge_t[]){
@@ -329,7 +329,7 @@ static const model_t tile_models[] = {
         .surfaces = (surface_t[]){
             {27, (index_t[]){
                 199, 276, 480, 69, 395, 67, 484, 600, 487, 239, 466, 677, 239, 677, 196, 578, 656, 68, 656, 196, 678, 656, 678, 652, 11, 54, 168, 
-            }, RGBPIX(255, 255, 255)},
+            }, HEXPIX(FFFFFF)},
         },
         .edge_count = 941,
         .edges = (edge_t[]){
@@ -430,7 +430,7 @@ static const model_t tile_models[] = {
         .surfaces = (surface_t[]){
             {3, (index_t[]){
                 145, 150, 139, 
-            }, RGBPIX(255, 255, 255)},
+            }, HEXPIX(FFFFFF)},
         },
         .edge_count = 334,
         .edges = (edge_t[]){

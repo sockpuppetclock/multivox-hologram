@@ -206,7 +206,7 @@ static void parse_args(int argc, char** argv) {
 
 static void* map_volume() {
     mode_t old_umask = umask(0);
-    volume_fd = shm_open("/rotovox_double_buffer", O_CREAT | O_RDWR, 0666);
+    volume_fd = shm_open("/vortex_double_buffer", O_CREAT | O_RDWR, 0666);
     umask(old_umask);
     if (volume_fd == -1) {
         perror("shm_open");

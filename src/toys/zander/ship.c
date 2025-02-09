@@ -29,9 +29,9 @@ static const model_t ship_model = {
     .vertex_count = 9,
 
     .surfaces = (surface_t[]){
-        {15, (index_t[]){0, 1, 5, 1, 2, 5, 0, 5, 4, 2, 3, 5, 3, 4, 5}, RGBPIX(  0,255,127)},
-        { 9, (index_t[]){1, 2, 3, 0, 3, 4, 0, 1, 3},                   RGBPIX(  0,127,127)},
-        { 3, (index_t[]){6, 7, 8},                                     RGBPIX(255,255,  0)},
+        {15, (index_t[]){0, 1, 5, 1, 2, 5, 0, 5, 4, 2, 3, 5, 3, 4, 5}, HEXPIX(00FF55)},
+        { 9, (index_t[]){1, 2, 3, 0, 3, 4, 0, 1, 3},                   HEXPIX(005555)},
+        { 3, (index_t[]){6, 7, 8},                                     HEXPIX(FFFF00)},
     },
     .surface_count = 3,
 };

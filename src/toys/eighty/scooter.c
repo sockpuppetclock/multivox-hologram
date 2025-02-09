@@ -152,7 +152,7 @@ void scooter_draw(pixel_t* volume) {
             grid_vox_pos(vox, pos);
 
             const int length = 2;
-            pixel_t colour = RGBPIX(128,128,128);
+            pixel_t colour = HEXPIX(AAAAAA);
 
             int inf[2] = {max(         0, min(vox[0], vox[0] - direction[scooter->direction & 3][0] * length) - 1),
                           max(         0, min(vox[1], vox[1] - direction[scooter->direction & 3][1] * length) - 1)};

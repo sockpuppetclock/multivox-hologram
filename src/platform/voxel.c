@@ -12,7 +12,7 @@ static int voxel_fd = -1;
 
 bool voxel_buffer_map(void) {
 
-    voxel_fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
+    voxel_fd = shm_open("/vortex_double_buffer", O_RDWR, 0666);
     if (voxel_fd == -1) {
         perror("shm_open");
         return false;

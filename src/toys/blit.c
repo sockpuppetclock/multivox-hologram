@@ -57,7 +57,7 @@ void vox_blit(const char* filename) {
 
 int main(int argc, char** argv) {
 
-    content_fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
+    content_fd = shm_open("/vortex_double_buffer", O_RDWR, 0666);
     if (content_fd == -1) {
         perror("shm_open");
         exit(1);

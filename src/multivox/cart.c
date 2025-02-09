@@ -26,7 +26,7 @@ static model_t cart_model = {
             14, 3, 14, 15, 3, 3, 15, 4, 15, 16, 4, 4, 16, 5, 16, 17, 5, 5, 17, 6, 17, 18, 6, 6, 18, 7, 18, 19, 7, 7, 19, 8, 19, 20, 8, 8, 20, 9, 20, 21, 
             9, 9, 21, 10, 21, 22, 10, 10, 22, 11, 22, 23, 11, 11, 23, 0, 23, 12, 0, 0, 12, 1, 12, 23, 13, 13, 23, 14, 14, 23, 16, 14, 16, 15, 16, 23, 17, 17, 23, 22, 
             17, 22, 19, 19, 22, 20, 20, 22, 21, 19, 18, 17, 
-        }, RGBPIX(255, 255, 255)},
+        }, HEXPIX(FFFFFF)},
     },
 };
 
@@ -184,7 +184,7 @@ bool cart_load(cart_t* cart, char* filename) {
     cartpath[namelen] = '\0';
     cart->cartpath = cartpath;
     
-    cart->colour = RGBPIX(0xff,0x00,0xff);
+    cart->colour = HEXPIX(FF00FF);
 
     char line[1024];
     while (fgets(line, sizeof(line), file)) {

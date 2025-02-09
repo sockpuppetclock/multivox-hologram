@@ -28,7 +28,7 @@ image_t* image_load(const char* filename) {
             image->height = h;
 
             image->masked = false;
-            image->key = RGBPIX(32,0,0);
+            image->key = HEXPIX(200000);
 
             int size = image->width * image->height;
             image->data = malloc(sizeof(pixel_t) * size);
@@ -58,7 +58,7 @@ image_t* image_load(const char* filename) {
                     for (int i = 0; i < size; ++i) {
                         uint8_t* p = &data[i*c];
                         if (image->data[i] == image->key && p[a] >= 128) {
-                            image->data[i] ^= RGBPIX(32,0,0);
+                            image->data[i] ^= HEXPIX(200000);
                         }
                     }
                 }

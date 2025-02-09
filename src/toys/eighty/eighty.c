@@ -47,42 +47,29 @@ void main_draw(pixel_t* volume) {
 }
 
 int main(int argc, char** argv) {
-
-    int fd = shm_open("/rotovox_double_buffer", O_RDWR, 0666);
-    if (fd == -1) {
-        perror("shm_open");
+    if (!voxel_buffer_map()) {
         exit(1);
     }
-
-    volume_buffer = mmap(NULL, sizeof(*volume_buffer), PROT_WRITE, MAP_SHARED, fd, 0);
-    if (volume_buffer == MAP_FAILED) {
-        perror("mmap");
-        exit(1);
-    }
-
-    volume_buffer->bits_per_channel = 2;
 
     main_init();
 
     input_set_nonblocking();
 
     for (int ch = 0; ch != 27; ch = getchar()) {
-        uint8_t page = !volume_buffer->page;
-        pixel_t* volume = volume_buffer->volume[page];
-
         timer_tick();
 
-        memset(volume, 0, sizeof(volume_buffer->volume[page]));
+        pixel_t* volume = voxel_buffer_get(VOXEL_BUFFER_BACK);
+        voxel_buffer_clear(volume);
 
         main_update((float)timer_delta_time * 0.001f);
         main_draw(volume);
-        volume_buffer->page = page;
+
+        voxel_buffer_swap();
 
         timer_sleep_until(TIMER_SINCE_TICK, 30);
     }
 
-    munmap(volume_buffer, sizeof(*volume_buffer));
-    close(fd);
+    voxel_buffer_unmap();
 
     return 0;
 }

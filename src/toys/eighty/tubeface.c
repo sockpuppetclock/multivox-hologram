@@ -76,7 +76,7 @@ static const model_t model_tubeface = {
             67, 67, 207, 69, 69, 207, 71, 71, 207, 73, 73, 207, 75, 75, 207, 77, 77, 207, 79, 79, 207, 81, 81, 207, 83, 83, 207, 85, 85, 207, 87, 87, 207, 89, 89, 207, 91, 91, 207, 93, 
             93, 207, 95, 95, 207, 97, 97, 207, 99, 99, 207, 101, 101, 207, 103, 103, 207, 105, 105, 207, 107, 107, 207, 109, 109, 207, 111, 111, 207, 113, 113, 207, 115, 115, 207, 117, 117, 207, 119, 119, 
             207, 121, 121, 207, 123, 123, 207, 125, 125, 207, 127, 127, 207, 129, 
-        }, RGBPIX(255, 255, 255), &face_tex}
+        }, HEXPIX(FFFFFF), &face_tex}
     }
 };
 
@@ -103,7 +103,7 @@ static void draw_voxel(pixel_t* volume, const int* coordinate, pixel_t colour) {
     }
 
     uint8_t face = colour & 0x80;
-    volume[VOXEL_INDEX(x, y, z)] = face ? RGBPIX(128,127,127) : RGBPIX(shine, 128, 255);
+    volume[VOXEL_INDEX(x, y, z)] = face ? HEXPIX(AA5555) : RGBPIX(shine, 0xAA, 0xFF);
 }
 
 void tubeface_init(void) {

@@ -23,10 +23,10 @@ typedef struct {
 #define OCCUPANT_TYPES 8
 static occupant_t occupants[OCCUPANT_TYPES] = {
     {.colour=0, .height=0},
-    {.colour=RGBPIX(0,127,127), .height=2},
-    {.colour=RGBPIX(255,127,0), .height=2},
-    {.colour=RGBPIX(0,0,255), .height=8},
-    {.colour=RGBPIX(128,127,0), .height=8},
+    {.colour=HEXPIX(005555), .height=2},
+    {.colour=HEXPIX(FF5500), .height=2},
+    {.colour=HEXPIX(0000FF), .height=8},
+    {.colour=HEXPIX(AA5500), .height=8},
 };
 
 #define GRID_FLOOR 6
@@ -136,7 +136,7 @@ void grid_mark(int id, const int* cell, uint8_t walls) {
 
 void grid_draw(pixel_t* volume) {
     const int z0 = GRID_FLOOR;
-    const pixel_t basecol = RGBPIX(127,255,255);
+    const pixel_t basecol = HEXPIX(55FFFF);
 
     for (int y = 0; y < GRID_WIDTH; ++y) {
         for (int x = 0; x < GRID_HEIGHT; ++x) {

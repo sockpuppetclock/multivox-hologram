@@ -51,11 +51,11 @@ static int tess_edges[32][2] = {
 };
 
 static const pixel_t colours[] = {
-    RGBPIX(255,  0,  0),
-    RGBPIX(255,255,  0),
-    RGBPIX(  0,255,  0),
-    RGBPIX(  0,255,255),
-    RGBPIX(  0,  0,255),
+    HEXPIX(FF0000),
+    HEXPIX(FFFF00),
+    HEXPIX(00FF00),
+    HEXPIX(00FFFF),
+    HEXPIX(0000FF),
 };
 
 
