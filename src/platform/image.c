@@ -5,10 +5,7 @@
 
 #include "image.h"
 
-#include "graphics.h"
-#include "mathc.h"
 #include "rammel.h"
-#include "array.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"

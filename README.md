@@ -6,9 +6,9 @@
 
 This is the code I currently use to drive my [volumetric displays](https://www.youtube.com/watch?v=pcAEqbYwixU).
 
-It supports two closely related devices, which are configured in the `src/driver/gadgets` directory:  
-[Rotovox](https://youtu.be/97cLIO7FNtw) is a 400mm Orb featuring two 128x64 panels arranged vertically side by side.  
-[Vortex](https://youtu.be/Ozzpirkhi5c) is a 300mm Orb featuring two 128x64 panels arranged horizontally, back to back.
+It supports two closely related devices which are configured in the `src/driver/gadgets` directory:
+- [Rotovox](https://youtu.be/97cLIO7FNtw) is a 400mm Orb featuring two 128x64 panels arranged vertically side by side.  
+- [Vortex](https://youtu.be/Ozzpirkhi5c) is a 300mm Orb featuring two 128x64 panels arranged horizontally, back to back.
 
 Rotovox has a higher vertical resolution and better horizontal density; Vortex is brighter and has a higher refresh rate.
 
@@ -25,10 +25,11 @@ out to support a second similar gadget. There are assumptions about the hardware
 * It consists of two HUB75 LED panels spinning around a vertical axis.
 * The panels use either ABCDE addressing or ABC shift register addressing.
 * It uses a single GPIO (a photodiode or similar) to sync to rotation - high for 180°, low for 180°.
-* It's running on a Raspberry Pi 4. If you're using a different model, you'll need to change `BCM_BASE` in the
-  GPIO code - I haven't tested this, and you should assume it doesn't work.
+* It's running on a Raspberry Pi 4.
 
-The GPIO mappings and panel layout are defined in `src/driver/gadgets/gadget_<name>.h`.
+The GPIO mappings and panel layout are defined in `src/driver/gadgets/gadget_<name>.h`. GPIO is via memory mapped
+access - if you're using a different model of Pi you'll need to change `BCM_BASE` in the GPIO code. I haven't tested
+this, and you should probably assume it doesn't work.
 
 Input is via a bluetooth gamepad - I've been using an Xbox controller, and the input system is based on the default
 mapping for that.
@@ -213,13 +214,14 @@ acts as a launcher for all the games and demos you run on the hardware. The bund
 the `~/Multivox/carts/` directory as `.mct` files, and external apps can be launched by adding a `.mct` file containing
 its command, path and arguments.
 
-Each `.mct` file appears as a cartridge in the Multivox front end. The idea is that they should each have a title and 
-image on the side; at the moment all you can do to distinguish between them is change their colour in the `.mct`. When
-you exit an app back to the launcher, it grabs a snapshot of the voxel volume, and this is saved to give a preview of
-what you'll see when you launch a cart. This means there are two competing representations of the same information, and
-any future work on the front end will probably start with overhauling the entire approach.
+Each `.mct` file appears as a cartridge in the Multivox front end. They should each have a label on the side; at the moment
+all you can do to distinguish between them is change their colour in the `.mct`.
 
-It's also lacking some basic UI for controls such as changing bit depth, rebooting and so on.
+When you exit an app back to the launcher, it saves a snapshot of the voxel volume, and this gives a preview of what you'll
+see when you launch a cart. This means there are two competing representations of the same information, and any future work
+on the front end will probably start with overhauling the entire approach.
+
+Some basic UI for controls such as changing bit depth, rebooting and so on would also be a boon.
 
 |Control| Effect |
 | ----- | ------ |
@@ -230,3 +232,4 @@ It's also lacking some basic UI for controls such as changing bit depth, rebooti
 |☰ x5  | Power off |
 
 
+---

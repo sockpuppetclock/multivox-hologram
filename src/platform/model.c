@@ -612,15 +612,19 @@ void model_draw(pixel_t* volume, const model_t* model, float* matrix) {
     for (uint s = 0; s < model->surface_count; ++s) {
         surface_t* surface = &model->surfaces[s];
         for (uint t = 2; t < surface->index_count; t += 3) {
+            if (surface->image) {
+                graphics_triangle_texture(
+                        model->vertices[surface->indices[t-2]].texcoord.v,
+                        model->vertices[surface->indices[t-1]].texcoord.v,
+                        model->vertices[surface->indices[t  ]].texcoord.v,
+                        surface->image);
+            } else {
+                graphics_triangle_colour(surface->colour);
+            }
             graphics_draw_triangle( volume,
-                                    transformed[surface->indices[t-2]].v,
-                                    transformed[surface->indices[t-1]].v,
-                                    transformed[surface->indices[t  ]].v,
-                                    surface->colour,
-                                    model->vertices[surface->indices[t-2]].texcoord.v,
-                                    model->vertices[surface->indices[t-1]].texcoord.v,
-                                    model->vertices[surface->indices[t  ]].texcoord.v,
-                                    surface->image );
+                        transformed[surface->indices[t-2]].v,
+                        transformed[surface->indices[t-1]].v,
+                        transformed[surface->indices[t  ]].v);
         }
     }
 

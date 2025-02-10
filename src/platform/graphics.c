@@ -17,9 +17,30 @@
 #include "array.h"
 #include "image.h"
 
-//#define CHECK_BOUNDS
+static triangle_state_t triangle_state;
 
-graphics_draw_voxel_cb_t graphics_draw_voxel_cb = NULL;
+static void draw_triangle_flat(pixel_t* volume, const int* coordinate, const float* barycentric, const triangle_state_t* triangle) {
+    volume[VOXEL_INDEX(coordinate[0], coordinate[1], coordinate[2])] = triangle->colour;
+}
+
+static void draw_triangle_textured(pixel_t* volume, const int* coordinate, const float* barycentric, const triangle_state_t* triangle) {
+    bool masked = false;
+
+    float texcoord[2] = {
+        triangle->texcoord[0][0] * barycentric[0] + triangle->texcoord[1][0] * barycentric[1] + triangle->texcoord[2][0] * barycentric[2],
+        triangle->texcoord[0][1] * barycentric[0] + triangle->texcoord[1][1] * barycentric[1] + triangle->texcoord[2][1] * barycentric[2]
+    };
+    pixel_t colour = image_sample(triangle->texture, texcoord, &masked);
+    
+    if (!masked) {
+        volume[VOXEL_INDEX(coordinate[0], coordinate[1], coordinate[2])] = colour;
+    }
+}
+
+
+graphics_draw_voxel_cb_t graphics_triangle_shader_cb = NULL;
+static graphics_draw_voxel_cb_t draw_voxel_cb = draw_triangle_flat;
+
 
 #ifdef TRIANGLE_DITHER
 //some content looks better if we break up the stairstepping on shallow triangles
@@ -54,84 +75,109 @@ static inline bool clip(float* one, float* two, const uint c, const float maxval
     return false;
 }
 
-float *vec3_transform(float *result, const float *v0, const float *m0) {
-	float x = v0[0];
-	float y = v0[1];
-	float z = v0[2];
-	result[0] = m0[0] * x + m0[4] * y + m0[8] * z + m0[12];
-	result[1] = m0[1] * x + m0[5] * y + m0[9] * z + m0[13];
-	result[2] = m0[2] * x + m0[6] * y + m0[10] * z + m0[14];
-	return result;
+float* vec3_transform(float* vdst, const float* vsrc, const float* matrix) {
+    float vec[3] = {vsrc[0], vsrc[1], vsrc[2]};
+    for (int i = 0; i < 3; ++i) {
+        vdst[i] = matrix[i] * vec[0] + matrix[i+4] * vec[1] + matrix[i+8] * vec[2] + matrix[i+12];
+    }
+	return vdst;
 }
 
-float *mat4_apply_scale(float *result, float s) {
-    float temp[MAT4_SIZE] = {s,0,0,0, 0,s,0,0, 0,0,s,0, 0,0,0,1};
-    mat4_multiply(result, result, temp);
-    return result;
+float* mat4_apply_scale(float* matrix, const float* scale) {
+    for (int i = 0; i < 12; ++i) {
+        matrix[i] *= scale[i/4];
+    }
+    return matrix;
 }
 
-float *mat4_apply_translation(float *result, const float *v0) {
-    float temp[MAT4_SIZE] = {1,0,0,0, 0,1,0,0, 0,0,1,0, v0[0],v0[1],v0[2],1};
-    mat4_multiply(result, result, temp);
-    return result;
+float* mat4_apply_scale_f(float* matrix, float scale) {
+    for (int i = 0; i < 12; ++i) {
+        matrix[i] *= scale;
+    }
+    return matrix;
+}
+
+float* mat4_apply_translation(float* matrix, const float* vector) {
+    for (int i = 0; i < 4; ++i) {
+        matrix[i+12] += matrix[i] * vector[0] + matrix[i+4] * vector[1] + matrix[i+8] * vector[2];
+    }
+    return matrix;
 }
 
 float *mat4_apply_rotation_x(float *result, float angle) {
-    float temp[MAT4_SIZE];
-    
-    mat4_identity(temp);
-    mat4_rotation_x(temp, angle);
-    mat4_multiply(result, result, temp);
+    float multiplied[8];
 
+    float c = cosf(angle);
+    float s = sinf(angle);
+
+    multiplied[0] = result[4] * c + result[8] * s;
+    multiplied[1] = result[5] * c + result[9] * s;
+    multiplied[2] = result[6] * c + result[10]* s;
+    multiplied[3] = result[7] * c + result[11]* s;
+    multiplied[4] = result[4] *-s + result[8] * c;
+    multiplied[5] = result[5] *-s + result[9] * c;
+    multiplied[6] = result[6] *-s + result[10]* c;
+    multiplied[7] = result[7] *-s + result[11]* c;
+
+    memcpy(&result[4], multiplied, sizeof(multiplied));
     return result;
 }
 
 float *mat4_apply_rotation_y(float *result, float angle) {
-    float temp[MAT4_SIZE];
-    
-    mat4_identity(temp);
-    mat4_rotation_y(temp, angle);
-    mat4_multiply(result, result, temp);
+    float multiplied[8];
 
+    float c = cosf(angle);
+    float s = sinf(angle);
+
+    multiplied[0] = result[0] * c + result[8] * -s;
+    multiplied[1] = result[1] * c + result[9] * -s;
+    multiplied[2] = result[2] * c + result[10]* -s;
+    multiplied[3] = result[3] * c + result[11]* -s;
+    multiplied[4] = result[0] * s + result[8]  * c;
+    multiplied[5] = result[1] * s + result[9]  * c;
+    multiplied[6] = result[2] * s + result[10] * c;
+    multiplied[7] = result[3] * s + result[11] * c;
+
+    memcpy(result, multiplied, sizeof(*multiplied)*4);
+    memcpy(&result[8], &multiplied[4], sizeof(*multiplied)*4);
     return result;
 }
 
 float *mat4_apply_rotation_z(float *result, float angle) {
-    float temp[MAT4_SIZE];
-    
-    mat4_identity(temp);
-    mat4_rotation_z(temp, angle);
-    mat4_multiply(result, result, temp);
+    float multiplied[8];
 
+    float c = cosf(angle);
+    float s = sinf(angle);
+    
+    multiplied[0] = result[0] *  c + result[4] * s;
+    multiplied[1] = result[1] *  c + result[5] * s;
+    multiplied[2] = result[2] *  c + result[6] * s;
+    multiplied[3] = result[3] *  c + result[7] * s;
+    multiplied[4] = result[0] * -s + result[4] * c;
+    multiplied[5] = result[1] * -s + result[5] * c;
+    multiplied[6] = result[2] * -s + result[6] * c;
+    multiplied[7] = result[3] * -s + result[7] * c;
+
+    memcpy(result, multiplied, sizeof(multiplied));
     return result;
 }
 
-float *mat4_apply_rotation(float *result, const float *euler) {
-    float temp[MAT4_SIZE];
-    
-    mat4_identity(temp);
-    mat4_rotation_z(temp, euler[2]);
-    mat4_multiply(result, result, temp);
-    
-    mat4_identity(temp);
-    mat4_rotation_x(temp, euler[0]);
-    mat4_multiply(result, result, temp);
-    
-    mat4_identity(temp);
-    mat4_rotation_y(temp, euler[1]);
-    mat4_multiply(result, result, temp);
+float* mat4_apply_rotation(float* matrix, const float* euler) {
+    float cp = cosf(euler[0]);
+    float sp = sinf(euler[0]);
+    float cr = cosf(euler[1]);
+    float sr = sinf(euler[1]);
+    float cy = cosf(euler[2]);
+    float sy = sinf(euler[2]);
 
-    return result;
-}
+    float rotation[MAT4_SIZE] = {
+        cy*cr-sy*sp*sr, cr*sy+cy*sp*sr,-cp*sr, 0,
+       -cp*sy         , cy*cp         , sp   , 0,
+        cy*sr+cr*sy*sp, sy*sr-cy*cr*sp, cp*cr, 0,
+        0             , 0             , 0    , 1,
+    };
 
-void graphics_fade_buffer(pixel_t* dst, pixel_t* src) {
-    for (uint i = 0; i < VOXELS_COUNT; ++i) {
-        uint8_t pix = *src++;
-        pix = (pix & 0b11011010) >> 1;
-        //pix -= (((pix & 0b10010000)>>2) | ((pix & 0b01001010)>>1) | (pix & 0b00100101));
-        //pix = (pix & 0b11011011) - (((pix & 0b10010010)>>1) | (pix & 0b01001001));
-        *dst++ = pix;
-    }
+    return mat4_multiply(matrix, matrix, rotation);
 }
 
 static void draw_line_(pixel_t* volume, float x0, float x1, float y0, float y1, float z0, float z1, uint x_stride, uint y_stride, uint z_stride, pixel_t colour) {
@@ -223,8 +269,7 @@ void graphics_draw_line(pixel_t* volume, const float* pone, const float* ptwo, p
 }
 
 #ifdef TINY_TRIANGLES_CENTRED
-static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2, pixel_t colour,
-                                                const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
+static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2, pixel_t colour) {
 
     int pos[VEC3_SIZE] = {
         (int)roundf((v0[0] + v1[0] + v2[0]) * (1.0f/3.0f)),
@@ -236,38 +281,21 @@ static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1
         return;
     }
 
-    if (texture) {
-        float uv[VEC2_SIZE] = {
-            (uv0[0] + uv1[0] + uv2[0]) * (1.0f/3.0f),
-            (uv0[1] + uv1[1] + uv2[1]) * (1.0f/3.0f),
-        };
-        bool masked;
-        colour = image_sample(texture, uv, &masked);
-        if (masked) {
-            return;
-        }
-    }
+    float bary[3] = {1.0f/3.0f, 1.0f/3.0f, 1.0f/3.0f};
 
-    volume[VOXEL_INDEX(pos[0], pos[1], pos[2])] = colour;
+    draww_voxel_cb(volume, pos, bary, &triangle_state);
 }
 #else
-static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2, pixel_t colour,
-                                                const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
+static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2) {
 
     int pos[VEC3_SIZE] = {(int)v0[0], (int)v0[1], (int)v0[2]};
     if ((uint)pos[0] >= VOXELS_X || (uint)pos[1] >= VOXELS_Y || (uint)pos[2] >= VOXELS_Z) {
         return;
     }
 
-    if (texture) {
-        bool masked;
-        colour = image_sample(texture, uv0, &masked);
-        if (masked) {
-            return;
-        }
-    }
+    float bary[3] = {1.0f, 0.0f, 0.0f};
 
-    volume[VOXEL_INDEX(pos[0], pos[1], pos[2])] = colour;
+    draw_voxel_cb(volume, pos, bary, &triangle_state);
 }
 #endif
 
@@ -296,10 +324,30 @@ static void sort_channels(float* axis, int* xchannel, int* ychannel, int* zchann
     }*/ 
 }
 
-void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2, pixel_t colour,
-                                             const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
+void graphics_triangle_colour(pixel_t colour) {
+    triangle_state.colour = colour;
+    triangle_state.texture = NULL;
+}
 
+void graphics_triangle_texture(const float* uv0, const float* uv1, const float* uv2, image_t* texture) {
+    vec3_assign(triangle_state.texcoord[0], uv0);
+    vec3_assign(triangle_state.texcoord[1], uv1);
+    vec3_assign(triangle_state.texcoord[2], uv2);
+    triangle_state.texture = texture;
+}
+
+void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, const float* v2) {
     // voxelise a triangle by rendering it on its most flat axis
+
+    if (graphics_triangle_shader_cb) {
+        draw_voxel_cb = graphics_triangle_shader_cb;
+    } else {
+        if (triangle_state.texture) {
+            draw_voxel_cb = draw_triangle_textured;
+        } else {
+            draw_voxel_cb = draw_triangle_flat;
+        }
+    }
 
     float ab_min[VEC3_SIZE];
     vec3_min(ab_min, v0, v1);
@@ -322,7 +370,7 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
 
     float areasq2 = vec3_dot(minor, minor);
     if (areasq2 < 4) {
-        draw_tiny_triangle(volume, v0, v1, v2, colour, uv0, uv1, uv2, texture);
+        draw_tiny_triangle(volume, v0, v1, v2);
         return;
     }
 
@@ -331,6 +379,7 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
     int xchannel, ychannel, zchannel;
     sort_channels(minor, &xchannel, &ychannel, &zchannel);
     if (ab_max[xchannel] - ab_min[xchannel] < ab_max[ychannel] - ab_min[ychannel]) {
+        // favour wide spans for early-out
         swap(&xchannel, &ychannel);
     }
 
@@ -386,30 +435,7 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
 #endif
                 voxel[zchannel] = (int)floorf(v0[zchannel] * w[0] + v1[zchannel] * w[1] + v2[zchannel] * w[2] + dither);
                 if ((uint)voxel[zchannel] < voxels_z) {
-#ifdef CHECK_BOUNDS
-                    if ((uint)voxel[0] >= VOXELS_X || (uint)voxel[1] >= VOXELS_Y || (uint)voxel[2] >= VOXELS_Z) {
-                        printf("bwart\n");
-                        voxel[0] &= (VOXELS_X-1);
-                        voxel[1] &= (VOXELS_Y-1);
-                        voxel[2] &= (VOXELS_Z-1);
-                    }
-#endif
-                    bool masked = false;
-                    if (texture) {
-                        float texcoord[2] = {
-                            uv0[0] * w[0] + uv1[0] * w[1] + uv2[0] * w[2],
-                            uv0[1] * w[0] + uv1[1] * w[1] + uv2[1] * w[2]
-                        };
-                        colour = image_sample(texture, texcoord, &masked);
-                    }
-                    
-                    if (!masked) {
-                        if (graphics_draw_voxel_cb) {
-                            graphics_draw_voxel_cb(volume, voxel, colour);
-                        } else {
-                            volume[VOXEL_INDEX(voxel[0], voxel[1], voxel[2])] = colour;
-                        }
-                    }
+                    draw_voxel_cb(volume, voxel, w, &triangle_state);
                 }
             } else if (done) {
                 break;
@@ -422,12 +448,5 @@ void graphics_draw_triangle(pixel_t* volume, const float* v0, const float* v1, c
         voxel[ychannel] += 1.0f;
     }
 }
-
-
-void graphics_cleanup() {
-}
-
-
-
 
 

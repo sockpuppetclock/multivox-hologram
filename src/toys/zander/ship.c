@@ -176,7 +176,7 @@ void ship_update(float dt) {
 }
 
 
-static void draw_voxel(pixel_t* volume, const int* coordinate, pixel_t colour) {
+static void draw_voxel(pixel_t* volume, const int* coordinate, const float* barycentric, const triangle_state_t* triangle) {
     int8_t surface = HEIGHT_MAP_OBJECT(coordinate[0], coordinate[1]);
     int8_t ground = HEIGHT_MAP_TERRAIN(coordinate[0], coordinate[1]);
 
@@ -189,7 +189,7 @@ static void draw_voxel(pixel_t* volume, const int* coordinate, pixel_t colour) {
     }
 
     if (coordinate[2] > ground) {
-        volume[VOXEL_INDEX(coordinate[0], coordinate[1], coordinate[2])] = debug_collision ? ~colour : colour;
+        volume[VOXEL_INDEX(coordinate[0], coordinate[1], coordinate[2])] = debug_collision ? ~triangle->colour : triangle->colour;
 
         // shadow
         surface = max(0, surface);
@@ -206,16 +206,16 @@ void ship_draw(pixel_t* volume) {
     float matrix[MAT4_SIZE];
     float position[VEC3_SIZE];
 
-    graphics_draw_voxel_cb = draw_voxel;
+    graphics_triangle_shader_cb = draw_voxel;
 
     vec3_subtract(position, ship_position.v, world_position.v);
 
     mat4_identity(matrix);
     mat4_apply_translation(matrix, (float[3]){(VOXELS_X-1)*0.5f, (VOXELS_Y-1)*0.5f, 0});
-    mat4_apply_scale(matrix, world_scale);
+    mat4_apply_scale_f(matrix, world_scale);
     mat4_apply_translation(matrix, position);
     mat4_apply_rotation(matrix, ship_rotation.v);
     model_draw(volume, &ship_model, matrix);
 
-    graphics_draw_voxel_cb = NULL;
+    graphics_triangle_shader_cb = NULL;
 }

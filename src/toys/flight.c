@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
         float world[MAT4_SIZE];
         mat4_identity(world);
         mat4_apply_translation(world, volume_centre);
-        mat4_apply_scale(world, zoom);
+        mat4_apply_scale_f(world, zoom);
         mat4_apply_translation(world, world_position);
         mat4_apply_rotation(world, world_rotation);
 
@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
                     memcpy(matrix, world, sizeof(matrix));
                     mat4_apply_translation(matrix, tile->position);
                     mat4_apply_rotation(matrix, tile->rotation);
-                    mat4_apply_scale(matrix, tile->scale);
+                    mat4_apply_scale_f(matrix, tile->scale);
                     model_draw(volume, tile->model, matrix);
                 }
             }

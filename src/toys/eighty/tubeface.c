@@ -89,9 +89,24 @@ static uint32_t prbs31(uint32_t curr) {
     return next;
 }
 
-static void draw_voxel(pixel_t* volume, const int* coordinate, pixel_t colour) {
+static void draw_voxel(pixel_t* volume, const int* coordinate, const float* barycentric, const triangle_state_t* triangle) {
     static uint32_t fuzz = 0;
     fuzz = prbs31(fuzz);
+
+    pixel_t colour = triangle->colour;
+
+    if (triangle->texture) {
+        float texcoord[2] = {
+            triangle->texcoord[0][0] * barycentric[0] + triangle->texcoord[1][0] * barycentric[1] + triangle->texcoord[2][0] * barycentric[2],
+            triangle->texcoord[0][1] * barycentric[0] + triangle->texcoord[1][1] * barycentric[1] + triangle->texcoord[2][1] * barycentric[2]
+        };
+        
+        bool masked = false;
+        colour = image_sample(triangle->texture, texcoord, &masked);
+        if (masked) {
+            return;
+        }
+    }
 
     uint8_t shine = tubeface_shine + ((colour & 0x7f)*2);// + ((coordinate[0]^coordinate[1]^coordinate[2])&4)*109;
 
@@ -120,11 +135,11 @@ void tubeface_draw(pixel_t* volume) {
     float matrix[MAT4_SIZE];
 
     tubeface_shine = timer_frame_time / 4;
-    graphics_draw_voxel_cb = draw_voxel;
+    graphics_triangle_shader_cb = draw_voxel;
 
     mat4_identity(matrix);
-    mat4_apply_translation(matrix, (float[3]){VOXELS_X*0.5f, VOXELS_Y*0.5f, 32});
+    mat4_translation(matrix, matrix, (float[3]){VOXELS_X*0.5f, VOXELS_Y*0.5f, 32});
     model_draw(volume, &model_tubeface, matrix);
 
-    graphics_draw_voxel_cb = NULL;
+    graphics_triangle_shader_cb = NULL;
 }

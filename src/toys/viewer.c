@@ -428,7 +428,7 @@ int main(int argc, char** argv) {
 
                 mat4_apply_translation(matrix, centre);
                 mat4_apply_translation(matrix, model_position);
-                mat4_apply_scale(matrix, model_scale);
+                mat4_apply_scale_f(matrix, model_scale);
                 mat4_apply_rotation(matrix, model_rotation);
             } break;
 
@@ -442,7 +442,7 @@ int main(int argc, char** argv) {
                 vec3_add(model_position, model_position, direction);
 
                 mat4_apply_translation(matrix, centre);
-                mat4_apply_scale(matrix, model_scale);
+                mat4_apply_scale_f(matrix, model_scale);
                 mat4_apply_rotation(matrix, model_rotation);
                 mat4_apply_translation(matrix, model_position);
             } break;

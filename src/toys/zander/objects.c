@@ -360,13 +360,13 @@ bool objects_hit_and_destroy(float* position) {
 void objects_update(float dt) {
 }
 
-static void draw_voxel(pixel_t* volume, const int* coordinate, pixel_t colour) {
+static void draw_voxel(pixel_t* volume, const int* coordinate, const float* barycentric, const triangle_state_t* triangle) {
     if (coordinate[2] > HEIGHT_MAP_OBJECT(coordinate[0], coordinate[1])) {
         HEIGHT_MAP_OBJECT(coordinate[0], coordinate[1]) = coordinate[2];
     }
 
     if (coordinate[2] > HEIGHT_MAP_TERRAIN(coordinate[0], coordinate[1])) {
-        volume[VOXEL_INDEX(coordinate[0], coordinate[1], coordinate[2])] = colour;
+        volume[VOXEL_INDEX(coordinate[0], coordinate[1], coordinate[2])] = triangle->colour;
     }
     if ((uint8_t)HEIGHT_MAP_TERRAIN(coordinate[0], coordinate[1]) < VOXELS_Z) {
         volume[VOXEL_INDEX(coordinate[0], coordinate[1], HEIGHT_MAP_TERRAIN(coordinate[0], coordinate[1]))] = 0;
@@ -381,12 +381,12 @@ void objects_draw(pixel_t* volume) {
     };
     int tiles = (int)ceilf((float)VOXELS_X / world_scale);
     
-    graphics_draw_voxel_cb = draw_voxel;
+    graphics_triangle_shader_cb = draw_voxel;
 
     float world[MAT4_SIZE];
     mat4_identity(world);
     mat4_apply_translation(world, (float[3]){(VOXELS_X-1)*0.5f, (VOXELS_Y-1)*0.5f, 0});
-    mat4_apply_scale(world, world_scale);
+    mat4_apply_scale_f(world, world_scale);
     mat4_apply_translation(world, (float[3]){-world_position.x, -world_position.y, -world_position.z});
 
     vec3_t position;
@@ -413,6 +413,6 @@ void objects_draw(pixel_t* volume) {
         }
     }
 
-    graphics_draw_voxel_cb = NULL;
+    graphics_triangle_shader_cb = NULL;
 
 }

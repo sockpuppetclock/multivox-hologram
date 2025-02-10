@@ -119,8 +119,9 @@ int main(int argc, char** argv) {
         if (show_faces) {
             for (uint i = 0; i < count_of(tess_faces); ++i) {
                 pixel_t colour = colours[i % count_of(colours)] & 0b01101101;
-                graphics_draw_triangle(volume, transformed[tess_faces[i][0]].v, transformed[tess_faces[i][1]].v, transformed[tess_faces[i][2]].v, colour, NULL, NULL, NULL, NULL);
-                graphics_draw_triangle(volume, transformed[tess_faces[i][0]].v, transformed[tess_faces[i][2]].v, transformed[tess_faces[i][3]].v, colour, NULL, NULL, NULL, NULL);
+                graphics_triangle_colour(colour);
+                graphics_draw_triangle(volume, transformed[tess_faces[i][0]].v, transformed[tess_faces[i][1]].v, transformed[tess_faces[i][2]].v);
+                graphics_draw_triangle(volume, transformed[tess_faces[i][0]].v, transformed[tess_faces[i][2]].v, transformed[tess_faces[i][3]].v);
             }
         }
 

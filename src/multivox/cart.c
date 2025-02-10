@@ -66,6 +66,7 @@ void cart_grab_voxshot(cart_t* cart, const pixel_t* volume) {
         memset(cart->voxel_shot[0], 0, VOXELS_COUNT * sizeof(pixel_t));
     }
 
+    // grab the cylinder of visible voxels currently in the display buffer
     for (int y = 0; y < VOXELS_Y; ++y) {
         for (int x = 0; x < VOXELS_X; ++x) {
             if (voxel_in_cylinder(x, y)) {
@@ -76,6 +77,7 @@ void cart_grab_voxshot(cart_t* cart, const pixel_t* volume) {
         }
     }
 
+    // generate a few vipvap levels
     int count[3] = {VOXELS_X, VOXELS_Y, VOXELS_Z};
     for (int m = 1; m < count_of(cart->voxel_shot); ++m) {
         count[0] /= 2;
@@ -115,36 +117,38 @@ void cart_grab_voxshot(cart_t* cart, const pixel_t* volume) {
 
 }
 
-static void try_load_voxshot(cart_t* cart, char* filename) {
+static bool try_load_voxshot(cart_t* cart, char* filename) {
     int fd = open(filename, O_RDONLY);
     if (fd == -1) {
-        return;
+        return false;
     }
 
     struct stat sb;
     if (fstat(fd, &sb) == -1) {
         perror("fstat");
         close(fd);
-        return;
+        return false;
     }
 
     size_t size = sb.st_size;
     if (size != VOXELS_COUNT) {
         close(fd);
-        return;
+        return false;
     }
 
     void* mapped = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (mapped == MAP_FAILED) {
         perror("mmap");
         close(fd);
-        return;
+        return false;
     }
 
     cart_grab_voxshot(cart, mapped);
 
     munmap(mapped, size);
     close(fd);
+    
+    return true;
 }
 
 void cart_save_voxshot(cart_t* cart) {
