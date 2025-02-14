@@ -232,7 +232,7 @@ void cart_draw(cart_t* cart, pixel_t* volume, float slot_angle) {
     cart_model.surfaces[0].colour = cart->colour;
     model_draw(volume, &cart_model, matrix);
 
-    int z0 = abs(slot_angle * 100);
+    int z0 = slot_angle * slot_angle * 320;
     const int m = 1;
     if (cart->voxel_shot[m]) {
         for (int y = 0; y < VOXELS_Y>>m; ++y) {
