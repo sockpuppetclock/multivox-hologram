@@ -29,6 +29,8 @@ typedef enum {
     BUTTON_RIGHT,
     BUTTON_UP,
     BUTTON_DOWN,
+    BUTTON_LT,
+    BUTTON_RT,
     BUTTON_COUNT
 } button_t;
 
