@@ -180,6 +180,31 @@ float* mat4_apply_rotation(float* matrix, const float* euler) {
     return mat4_multiply(matrix, matrix, rotation);
 }
 
+
+static void swap(int* a, int* b) {
+    int t = *a;
+    *a = *b;
+    *b = t;
+}
+
+static void sort_channels(float* axis, int* xchannel, int* ychannel, int* zchannel) {
+    *xchannel = 0;
+    *ychannel = 1;
+    *zchannel = 2;
+
+    if (axis[*ychannel] > axis[*zchannel]) {
+        swap(ychannel, zchannel);
+    }
+    if (axis[*xchannel] > axis[*zchannel]) {
+        swap(xchannel, zchannel);
+    }
+
+    /* don't actually care about the order of x & y
+    if (axis[*xchannel] > axis[*ychannel]) {
+        swap(xchannel, ychannel);
+    }*/ 
+}
+
 static void draw_line_(pixel_t* volume, float x0, float x1, float y0, float y1, float z0, float z1, uint x_stride, uint y_stride, uint z_stride, pixel_t colour) {
     float x = x0;
     float y = y0;
@@ -210,10 +235,6 @@ static void draw_line_(pixel_t* volume, float x0, float x1, float y0, float y1, 
     }
 
     while (x < x1) {
-        uint idx = (int)x * x_stride + (int)y * y_stride + (int)z * z_stride;
-        if (idx < VOXELS_COUNT) {
-            volume[idx] = colour;
-        }
         while (ey > 0) {
             y += sdy;
             --ey;
@@ -221,6 +242,11 @@ static void draw_line_(pixel_t* volume, float x0, float x1, float y0, float y1, 
         while (ez > 0) {
             z += sdz;
             --ez;
+        }
+        
+        uint idx = (int)x * x_stride + (int)y * y_stride + (int)z * z_stride;
+        if (idx < VOXELS_COUNT) {
+            volume[idx] = colour;
         }
         
         ++x;
@@ -247,24 +273,14 @@ void graphics_draw_line(pixel_t* volume, const float* pone, const float* ptwo, p
     vec3_subtract(delta, one.v, two.v);
     vec3_abs(delta, delta);
 
-    if (delta[0] > delta[1] && delta[0] > delta[2]) {
-        if (one.x < two.x) {
-            draw_line_(volume, one.x, two.x, one.y, two.y, one.z, two.z, VOXEL_X_STRIDE, VOXEL_Y_STRIDE, VOXEL_Z_STRIDE, colour);
-        } else {
-            draw_line_(volume, two.x, one.x, two.y, one.y, two.z, one.z, VOXEL_X_STRIDE, VOXEL_Y_STRIDE, VOXEL_Z_STRIDE, colour);
-        }
-    } else if (delta[1] > delta[0] && delta[1] > delta[2]) {
-        if (one.y < two.y) {
-            draw_line_(volume, one.y, two.y, one.x, two.x, one.z, two.z, VOXEL_Y_STRIDE, VOXEL_X_STRIDE, VOXEL_Z_STRIDE, colour);
-        } else {
-            draw_line_(volume, two.y, one.y, two.x, one.x, two.z, one.z, VOXEL_Y_STRIDE, VOXEL_X_STRIDE, VOXEL_Z_STRIDE, colour);
-        }
+    int c[3];
+    sort_channels(delta, &c[0], &c[1], &c[2]);
+
+    const uint stride[3] = {VOXEL_X_STRIDE, VOXEL_Y_STRIDE, VOXEL_Z_STRIDE};
+    if (one.v[c[2]] < two.v[c[2]]) {
+        draw_line_(volume, one.v[c[2]], two.v[c[2]], one.v[c[1]], two.v[c[1]], one.v[c[0]], two.v[c[0]], stride[c[2]], stride[c[1]], stride[c[0]], colour);
     } else {
-        if (one.z < two.z) {
-            draw_line_(volume, one.z, two.z, one.y, two.y, one.x, two.x, VOXEL_Z_STRIDE, VOXEL_Y_STRIDE, VOXEL_X_STRIDE, colour);
-        } else {
-            draw_line_(volume, two.z, one.z, two.y, one.y, two.x, one.x, VOXEL_Z_STRIDE, VOXEL_Y_STRIDE, VOXEL_X_STRIDE, colour);
-        }
+        draw_line_(volume, two.v[c[2]], one.v[c[2]], two.v[c[1]], one.v[c[1]], two.v[c[0]], one.v[c[0]], stride[c[2]], stride[c[1]], stride[c[0]], colour);
     }
 }
 
@@ -298,31 +314,6 @@ static void draw_tiny_triangle(pixel_t* volume, const float* v0, const float* v1
     draw_voxel_cb(volume, pos, bary, &triangle_state);
 }
 #endif
-
-
-static void swap(int* a, int* b) {
-    int t = *a;
-    *a = *b;
-    *b = t;
-}
-
-static void sort_channels(float* axis, int* xchannel, int* ychannel, int* zchannel) {
-    *xchannel = 0;
-    *ychannel = 1;
-    *zchannel = 2;
-
-    if (axis[*ychannel] > axis[*zchannel]) {
-        swap(ychannel, zchannel);
-    }
-    if (axis[*xchannel] > axis[*zchannel]) {
-        swap(xchannel, zchannel);
-    }
-
-    /* don't actually care about the order of x & y
-    if (axis[*xchannel] > axis[*ychannel]) {
-        swap(xchannel, ychannel);
-    }*/ 
-}
 
 void graphics_triangle_colour(pixel_t colour) {
     triangle_state.colour = colour;
