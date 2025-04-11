@@ -37,6 +37,7 @@ void reset_terminal_mode() {
     tcsetattr(0, TCSANOW, &termzero);
 }
 
+// sets terminal to noncanonical mode, sets nonblocking file reading
 void input_set_nonblocking(void) {
     struct termios term;
     
@@ -48,6 +49,7 @@ void input_set_nonblocking(void) {
     term.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &term);
 
+    // set stdin to not block
     int fc = fcntl(STDIN_FILENO, F_GETFL, 0);
     fcntl(STDIN_FILENO, F_SETFL, fc | O_NONBLOCK);
 }

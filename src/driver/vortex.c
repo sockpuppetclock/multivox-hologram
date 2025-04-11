@@ -298,6 +298,7 @@ static scanline_stack_t* horizontal_slice(uint line) {
     if (!rotation_stopped) {
         // if we've rotated by more than one slice since the last update, sweep trails will accumulate all the voxels
         // that we skipped over.
+        // by default, trail is only up to previous slice
 
         int skipped = clamp(SLICE_BUFFER_WRAP(slice_angle - last_scanned[line] + SLICE_COUNT) - 1, 0, sweep_trails);
         for (int s = 0; s < TRAIL_STACK; ++s) {
@@ -531,12 +532,12 @@ int main(int argc, char** argv) {
             }
         }
 #endif
-        clock_control();
+        // clock_control(); // not supported in DietPi
 
         // we unblank the previous row while we're shifting in the new row. This lookup defines
         // how late that unblank happens to vary the brightness for BCM
         const int bpc = min(max(1, buffer->bits_per_channel), BPC_MAX);
-        const int gamma[BPC_MAX] = {PANEL_WIDTH-120, PANEL_WIDTH-60, PANEL_WIDTH-30};
+        const int gamma[BPC_MAX] = {PANEL_WIDTH-60, PANEL_WIDTH-30, PANEL_WIDTH-15};
         int unblank[3] = {};
         for (int b = 0; b < bpc; ++b) {
             unblank[(b+1)%bpc] = gamma[b];
@@ -602,7 +603,7 @@ int main(int argc, char** argv) {
                 }
 
                 gpio_clear_bits(RGB_BITS_MASK | RGB_CLOCK_MASK);
-                gpio_set_bits(RGB_BLANK_MASK | RGB_STROBE_MASK | ADDR__EN_MASK);
+                gpio_set_bits(RGB_BLANK_MASK | RGB_STROBE_MASK); // | ADDR__EN_MASK);
 
                 if (b == 0) {
                     set_matrix_row(line);
@@ -610,7 +611,7 @@ int main(int argc, char** argv) {
                     tiny_wait(4);
                 }
 
-                gpio_clear_bits(RGB_STROBE_MASK | ADDR__EN_MASK);
+                gpio_clear_bits(RGB_STROBE_MASK); // | ADDR__EN_MASK);
             }
 
 #ifdef DEVELOPMENT_FEATURES
@@ -636,7 +637,7 @@ int main(int argc, char** argv) {
 #endif
     }
 
-    gpio_set_bits(RGB_BLANK_MASK | ADDR__EN_MASK);
+    gpio_set_bits(RGB_BLANK_MASK); // | ADDR__EN_MASK);
 
 #ifdef HORIZONTAL_PRESLICE
     slicer_running = false;
