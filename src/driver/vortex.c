@@ -322,8 +322,8 @@ static scanline_stack_t* horizontal_slice(uint line) {
         pixel_t* content = volume_buffer->volume[volume_buffer->page != 0];
 
         for (int c = 0; c < PANEL_WIDTH; ++c) {
-            for (int p = 0; p < 2; ++p) {
-                for (int f = 0; f < 2; ++f) {
+            for (int p = 0; p < PANEL_COUNT; ++p) {
+                for (int f = 0; f < PANEL_MULTIPLEX; ++f) {
                     switch (stop_axis) {
                         case 0:
                             stopped_row[p][f][c] = content[VOXEL_INDEX(stop_seq, c, (VOXELS_Z-1) - line - f * PANEL_FIELD_HEIGHT)];
