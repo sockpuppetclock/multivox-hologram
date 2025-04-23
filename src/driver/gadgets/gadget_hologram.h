@@ -42,7 +42,7 @@ static const int matrix_init_out[] = {RGB_0_B1, RGB_0_G1, RGB_0_R1, RGB_0_B2, RG
 #define PANEL_WIDTH  64
 #define PANEL_HEIGHT 64
 #define PANEL_COUNT 2
-#define PANEL_MULTIPLEX 1
+#define PANEL_MULTIPLEX 2
 #define PANEL_FIELD_HEIGHT (PANEL_HEIGHT / PANEL_MULTIPLEX)
 
 #define PANEL_0_ORDER(c) (c)
