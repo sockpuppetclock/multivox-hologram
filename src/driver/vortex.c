@@ -267,7 +267,7 @@ void* slicer_worker(void *vargp) {
                     if (v2d = &slice_map[sliceidx][c][p], v2d->x < VOXELS_X) {
                         for (int r = 0; r < PANEL_FIELD_HEIGHT; ++r) {
                             slice_buffer[bufferidx][r][p][0][c] = content[VOXEL_INDEX(v2d->x, v2d->y, (VOXELS_Z-1) - r)];
-                            slice_buffer[bufferidx][r][p][1][c] = content[VOXEL_INDEX(v2d->x, v2d->y, (VOXELS_Z-1) - r - PANEL_FIELD_HEIGHT)];
+                            // slice_buffer[bufferidx][r][p][1][c] = content[VOXEL_INDEX(v2d->x, v2d->y, (VOXELS_Z-1) - r - PANEL_FIELD_HEIGHT)];
                         }
                     }
                 }
