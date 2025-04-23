@@ -569,12 +569,12 @@ int main(int argc, char** argv) {
                         rgbbits |= (G_MTH_BIT(pix, b) << RGB_0_G1);
                         rgbbits |= (B_MTH_BIT(pix, b) << RGB_0_B1);
 
-                        for (pix = 0, s = 0; s < TRAIL_STACK; ++s) {
-                            pix |= (*stack)[s][0][1][PANEL_0_ORDER(c)];
-                        }
-                        rgbbits |= (R_MTH_BIT(pix, b) << RGB_0_R2);
-                        rgbbits |= (G_MTH_BIT(pix, b) << RGB_0_G2);
-                        rgbbits |= (B_MTH_BIT(pix, b) << RGB_0_B2);
+                        // for (pix = 0, s = 0; s < TRAIL_STACK; ++s) {
+                        //     pix |= (*stack)[s][0][1][PANEL_0_ORDER(c)];
+                        // }
+                        // rgbbits |= (R_MTH_BIT(pix, b) << RGB_0_R2);
+                        // rgbbits |= (G_MTH_BIT(pix, b) << RGB_0_G2);
+                        // rgbbits |= (B_MTH_BIT(pix, b) << RGB_0_B2);
                     }
                     if (debug_panel != 1) {
                         for (pix = 0, s = 0; s < TRAIL_STACK; ++s) {
@@ -584,12 +584,12 @@ int main(int argc, char** argv) {
                         rgbbits |= (G_MTH_BIT(pix, b) << RGB_1_G1);
                         rgbbits |= (B_MTH_BIT(pix, b) << RGB_1_B1);
 
-                        for (pix = 0, s = 0; s < TRAIL_STACK; ++s) {
-                            pix |= (*stack)[s][1][1][PANEL_1_ORDER(c)];
-                        }
-                        rgbbits |= (R_MTH_BIT(pix, b) << RGB_1_R2);
-                        rgbbits |= (G_MTH_BIT(pix, b) << RGB_1_G2);
-                        rgbbits |= (B_MTH_BIT(pix, b) << RGB_1_B2);
+                        // for (pix = 0, s = 0; s < TRAIL_STACK; ++s) {
+                        //     pix |= (*stack)[s][1][1][PANEL_1_ORDER(c)];
+                        // }
+                        // rgbbits |= (R_MTH_BIT(pix, b) << RGB_1_R2);
+                        // rgbbits |= (G_MTH_BIT(pix, b) << RGB_1_G2);
+                        // rgbbits |= (B_MTH_BIT(pix, b) << RGB_1_B2);
                     }
 
                     gpio_clear_bits(((~rgbbits) & RGB_BITS_MASK) | RGB_CLOCK_MASK | ((c==unblank[b]) << RGB_BLANK));
